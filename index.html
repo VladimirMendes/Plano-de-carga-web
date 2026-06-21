@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plano de Carga Offshore</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="auth-screen" class="container-centro">
+        <div class="corp-banner">
+            <h1>⚓ OFFSHORE CONTROL PRO</h1>
+            <p>Sistema de Engenharia Logística de Cargas Offshore</p>
+        </div>
+        <div class="corp-stripe"></div>
+        
+        <h5 style="margin-bottom: 15px;">Acesse o painel ou faça seu cadastro gratuito</h5>
+        
+        <div class="tabs-auth">
+            <button class="tab-auth-btn active" onclick="switchAuthTab('login')">🔐 Login Rápido</button>
+            <button class="tab-auth-btn" onclick="switchAuthTab('cadastro')">📝 Cadastro Gratuito</button>
+        </div>
+
+        <div id="form-login" class="auth-form-content">
+            <p class="caption">Login rápido via e-mail já cadastrado. Senha opcional.</p>
+            <div class="form-group">
+                <label>E-mail Cadastrado</label>
+                <input type="email" id="login-email" required placeholder="exemplo@empresa.com">
+            </div>
+            <div class="form-group">
+                <label>Senha (opcional)</label>
+                <input type="password" id="login-pwd">
+            </div>
+            <button class="btn btn-primary btn-full" onclick="executarLogin()">🚀 Acessar Painel</button>
+        </div>
+
+        <div id="form-cadastro" class="auth-form-content hidden">
+            <p class="caption">Preencha seus dados — todos os campos são obrigatórios.</p>
+            <div class="grid-2-cols">
+                <div class="form-group"><label>Nome Completo *</label><input type="text" id="cad-nome"></div>
+                <div class="form-group"><label>E-mail Corporativo *</label><input type="email" id="cad-email"></div>
+                <div class="form-group"><label>Empresa *</label><input type="text" id="cad-empresa"></div>
+                <div class="form-group"><label>Cargo *</label><input type="text" id="cad-cargo"></div>
+                <div class="form-group"><label>Localização (Cidade/UF) *</label><input type="text" id="cad-local"></div>
+                <div class="form-group"><label>Senha (opcional)</label><input type="password" id="cad-pwd"></div>
+            </div>
+            <button class="btn btn-primary btn-full" onclick="executarCadastro()">📨 Criar Conta e Acessar</button>
+        </div>
+        <div id="auth-message" class="message"></div>
+    </div>
+
+    <div id="main-panel" class="hidden">
+        <div class="corp-banner">
+            <h1>⚓ OFFSHORE CONTROL PRO</h1>
+            <p id="user-welcome-banner">Relatório Técnico de Engenharia Logística</p>
+        </div>
+        <div class="corp-stripe"></div>
+
+        <div class="user-header row no-print">
+            <div id="user-email-display" class="caption">📧 Usuário conectado: </div>
+            <button class="btn btn-danger" onclick="executarLogout()">🚪 Logout</button>
+        </div>
+
+        <div class="main-tabs no-print">
+            <button class="tab-btn active" onclick="switchMainTab('plano')">🚀 Plano de Carga</button>
+            <button class="tab-btn" onclick="switchMainTab('setup-cesta')">⚙️ Setup Cesta</button>
+            <button class="tab-btn" onclick="switchMainTab('setup-equip')">🔧 Setup Equipamentos</button>
+        </div>
+
+        <div id="tab-plano" class="tab-content">
+            <div id="kpi-container" class="kpi-container">
+                </div>
+            
+            <div id="alerta-logistica" class="alerta-logistica">
+                ⏳ Aguardando execução do cálculo. Clique em "⚡ CALCULAR TUDO" para iniciar.
+            </div>
+
+            <p class="secao-titulo">1. Detalhes Cartesianos (X, Y) Consolidados</p>
+            <div class="table-responsive">
+                <table id="tabela-cartesia">
+                    <thead>
+                        <tr>
+                            <th>Container / TAG</th>
+                            <th>Item</th>
+                            <th>Comp (m)</th>
+                            <th>Larg (m)</th>
+                            <th>Peso (kg)</th>
+                            <th>Pos X (m)</th>
+                            <th>Pos Y (m)</th>
+                            <th>Torque X</th>
+                            <th>Torque Y</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-cartesia-body"></tbody>
+                </table>
+            </div>
+
+            <p class="secao-titulo" style="margin-top: 20px;">2. Monitoramento de Ocupação Real por Unidade</p>
+            <div id="graficos-container"></div>
+
+            <div class="grid-2-cols no-print" style="margin-top: 20px;">
+                <button class="btn btn-primary btn-full" onclick="acionarCalculoGeral()">⚡ CALCULAR TUDO</button>
+                <button class="print-btn" onclick="window.print()">🖨️ GERAR PDF / IMPRIMIR</button>
+            </div>
+        </div>
+
+        <div id="tab-setup-cesta" class="tab-content hidden">
+            <h3 class="sub-titulo">PROPRIEDADES DA CESTA PADRÃO ATIVA</h3>
+            <div class="card-form">
+                <div class="grid-2-cols">
+                    <div class="form-group"><label>TAG da Unidade Ativa:</label><input type="text" id="cfg-tag"></div>
+                    <div class="form-group"><label>Comprimento Max Útil (m):</label><input type="number" id="cfg-comp" step="0.01"></div>
+                    <div class="form-group"><label>Largura Max Útil (m):</label><input type="number" id="cfg-larg" step="0.001"></div>
+                    <div class="form-group"><label>Altura Max Útil (m):</label><input type="number" id="cfg-alt" step="0.001"></div>
+                    <div class="form-group"><label>Tara Estrutural (kg):</label><input type="number" id="cfg-tara"></div>
+                    <div class="form-group"><label>Carga Max Útil (kg):</label><input type="number" id="cfg-carga"></div>
+                </div>
+                <div class="form-group row-toggle" style="margin-top: 10px;">
+                    <label style="margin-right: 10px;">Sobrepor Múltiplas Camadas:</label>
+                    <input type="checkbox" id="cfg-camadas" class="toggle-switch">
+                </div>
+                <button class="btn btn-primary" style="margin-top: 15px;" onclick="salvarConfigAtiva()">💾 SALVAR SETUP ATIVO</button>
+            </div>
+
+            <hr style="margin: 25px 0; border: 0; border-top: 1px solid #D1D5DB;">
+            <h3>⚙️ Gerenciador de Inventário de Contentores</h3>
+            
+            <div class="expander" onclick="toggleExpander()">➕ Adicionar Novo Contentor ao Banco de Dados</div>
+            <div id="expander-content" class="card-form hidden" style="margin-top: 5px;">
+                <div class="grid-2-cols">
+                    <div class="form-group"><label>TAG do Contentor:</label><input type="text" id="new-cnt-tag" placeholder="Ex: UNIT-G2"></div>
+                    <div class="form-group"><label>Comprimento Útil (m):</label><input type="number" id="new-cnt-comp" value="10" step="0.5"></div>
+                    <div class="form-group"><label>Largura Útil (m):</label><input type="number" id="new-cnt-larg" value="2" step="0.1"></div>
+                    <div class="form-group"><label>Altura Útil (m):</label><input type="number" id="new-cnt-alt" value="2" step="0.1"></div>
+                    <div class="form-group"><label>Tara Estrutural (kg):</label><input type="number" id="new-cnt-tara" value="1500"></div>
+                    <div class="form-group"><label>Carga Máxima Útil (kg):</label><input type="number" id="new-cnt-carga" value="7000"></div>
+                </div>
+                <button class="btn btn-primary" style="margin-top: 10px;" onclick="adicionarNovoContainer()">Inserir Contentor no Sistema</button>
+            </div>
+
+            <p style="font-weight: bold; margin-top: 15px;">📦 Contentores Cadastrados:</p>
+            <div id="lista-containers-cadastrados"></div>
+        </div>
+
+        <div id="tab-setup-equip" class="tab-content hidden">
+            <h3>🔧 Entrada Temporária de Manifesto de Carga (Grid Editável)</h3>
+            <p class="caption">Edite as células diretamente para ajustar os parâmetros da carga.</p>
+            
+            <div class="table-responsive">
+                <table id="grid-equipamentos">
+                    <thead>
+                        <tr>
+                            <th>Nome do Item</th>
+                            <th>Comprimento (m)</th>
+                            <th>Peso (kg)</th>
+                            <th>Largura (m)</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="grid-equipamentos-body"></tbody>
+                </table>
+            </div>
+            <button class="btn" style="background-color: #27ae60; color: white; margin-top: 10px;" onclick="adicionarLinhaGrid()">➕ Adicionar Linha</button>
+
+            <div class="grid-2-cols" style="margin-top: 20px;">
+                <button class="btn btn-full" style="background-color: #7F8C8D; color: white;" onclick="consolidarMemoriaGrid()">🔄 CONSOLIDAR NA MEMÓRIA</button>
+                <button class="btn btn-primary btn-full" onclick="salvarGridDisco()">💾 SALVAR NO DISCO (Navegador)</button>
+            </div>
+
+            <hr style="margin: 25px 0; border: 0; border-top: 1px solid #D1D5DB;">
+            <p style="font-weight: bold;">🎨 Legenda de Cores por Tipo de Material:</p>
+            <div id="legenda-cores" class="legenda-container"></div>
+        </div>
+    </div>
+
+    <script src="src/database.js"></script>
+    <script src="src/algorithm.js"></script>
+    <script src="src/main.js"></script>
+</body>
+</html>
