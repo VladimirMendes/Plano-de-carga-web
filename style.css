@@ -1,3 +1,6 @@
+/* ==========================================================================
+   CONFIGURAÇÕES GERAIS E ESTRUTURA
+   ========================================================================== */
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     margin: 0;
@@ -10,41 +13,51 @@ body {
 .caption { font-size: 11px; color: #6B7280; margin: 4px 0; }
 .grid-2-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
-/* Banner Corporativo */
+/* ==========================================================================
+   IDENTIDADE VISUAL (BANNER CORPORATIVO)
+   ========================================================================== */
 .corp-banner {
-    background-color: #003366; padding: 18px; border-radius: 6px 6px 0 0;
-    text-align: center; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    background-color: #003366; 
+    padding: 18px; 
+    border-radius: 6px 6px 0 0;
+    text-align: center; 
+    color: white; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 .corp-banner h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
 .corp-banner p  { margin: 4px 0 0 0; font-size: 12px; opacity: 0.9; }
 .corp-stripe   { background-color: #FFCC00; height: 6px; width: 100%; margin-bottom: 12px; border-radius: 0 0 4px 4px; }
 
-/* Painel de Login / Autenticação */
+/* ==========================================================================
+   AUTENTICAÇÃO E FORMULÁRIOS
+   ========================================================================== */
 .container-centro { max-width: 600px; margin: 40px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
 .tabs-auth { display: flex; border-bottom: 2px solid #E5E7EB; margin-bottom: 15px; }
 .tab-auth-btn { flex: 1; padding: 10px; border: none; background: none; cursor: pointer; font-weight: bold; color: #4B5563; }
 .tab-auth-btn.active { color: #003366; border-bottom: 3px solid #003366; }
 .auth-form-content { padding: 10px 0; }
 
-/* Formulários */
 .form-group { display: flex; flex-direction: column; margin-bottom: 12px; }
 .form-group label { font-size: 12px; font-weight: 600; margin-bottom: 4px; color: #4B5563; }
 .form-group input { padding: 8px; border: 1px solid #D1D5DB; border-radius: 4px; font-size: 13px; }
 
-/* Botões */
-.btn { padding: 9px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; }
+/* ==========================================================================
+   COMPONENTES DE NAVEGAÇÃO E BOTÕES
+   ========================================================================== */
+.btn { padding: 9px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; transition: background 0.2s ease; }
 .btn-primary { background-color: #003366; color: white; }
 .btn-primary:hover { background-color: #002244; }
 .btn-danger { background-color: #922B21; color: white; }
 .btn-full { width: 100%; }
 
-/* Abas Principais */
 .main-tabs { display: flex; gap: 5px; margin-bottom: 15px; background: #E5E7EB; padding: 4px; border-radius: 6px; }
 .tab-btn { flex: 1; padding: 10px; border: none; background: none; font-weight: bold; cursor: pointer; border-radius: 4px; color: #4B5563; }
 .tab-btn.active { background: white; color: #003366; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 .tab-content { background: white; padding: 20px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
 
-/* KPIs */
+/* ==========================================================================
+   DASHBOARD (KPIS E ALERTAS)
+   ========================================================================== */
 .kpi-container { display: flex; gap: 10px; width: 100%; margin-bottom: 15px; flex-wrap: wrap; }
 .kpi-card {
     flex: 1; min-width: 140px; background: white; border: 1px solid #D1D5DB;
@@ -54,54 +67,132 @@ body {
 .kpi-card span { font-size: 10px; font-weight: 700; color: #6B7280; display: block; margin-bottom: 4px; text-transform: uppercase; }
 .kpi-card h2 { margin: 0; font-size: 16px; color: #003366; font-weight: 800; }
 
-/* Alertas */
 .alerta-logistica { padding: 12px; font-weight: 700; font-size: 12px; border-radius: 6px; margin-bottom: 18px; text-align: center; color: white; }
 
-/* Tabelas */
+/* ==========================================================================
+   TABELAS DE DADOS CARTESIANOS
+   ========================================================================== */
 .table-responsive { overflow-x: auto; margin-top: 10px; }
 table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
 th, td { padding: 10px; border-bottom: 1px solid #E5E7EB; }
 th { background-color: #F3F4F6; color: #374151; font-weight: 600; }
 
-/* MOLDURA DA CESTA (Gráficos) */
+/* ==========================================================================
+   PLANO DE CARGA BIDIMENSIONAL AUTÔNOMO (MOLDURA E BLOCOS)
+   ========================================================================== */
 .moldura-cesta {
-    border: 2px solid #003366; background-color: #E5E8E8; padding: 15px;
-    border-radius: 6px; display: flex; flex-direction: column; gap: 15px;
-    width: 100%; box-sizing: border-box;
+    border: 2px solid #003366; 
+    background-color: #E5E8E8; 
+    padding: 15px;
+    border-radius: 6px; 
+    display: flex; 
+    flex-direction: column; 
+    gap: 15px;
+    width: 100%; 
+    box-sizing: border-box;
 }
+
+/* Alterado para flex-wrap dinâmico para permitir múltiplos equipamentos lado a lado */
 .linha-cesta {
-    display: flex; flex-direction: row; justify-content: center;
-    align-items: stretch; gap: 12px; width: 100%;
-    background-color: #F2F4F4; padding: 8px; border-radius: 4px;
-    flex-wrap: nowrap; overflow-x: auto;
+    display: flex; 
+    flex-direction: row; 
+    justify-content: flex-start;
+    align-items: flex-start; 
+    gap: 8px; 
+    width: 100%;
+    background-color: #F2F4F4; 
+    padding: 12px; 
+    border-radius: 4px;
+    flex-wrap: wrap; /* Permite quebrar linha caso extrapole a largura de 2m */
+    box-sizing: border-box;
 }
+
+/* Bloco adaptável às dimensões calculadas por JS */
 .bloco-ferramenta {
-    color: white; height: 38px; display: flex; align-items: center;
-    justify-content: center; font-weight: 700; font-size: 10px;
-    border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-    border: 1px solid rgba(0,0,0,0.2); min-width: 65px;
-    white-space: nowrap; box-sizing: border-box;
-    flex-grow: 0; flex-shrink: 0; padding: 0 6px;
+    color: white; 
+    height: 38px; 
+    display: flex; 
+    align-items: center;
+    justify-content: center; 
+    font-weight: 700; 
+    font-size: 10px;
+    border-radius: 4px; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    border: 1px solid rgba(0,0,0,0.2); 
+    white-space: nowrap; 
+    box-sizing: border-box;
+    padding: 0 8px;
     text-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
-.container-unidade h3 { font-size: 13px; color: #003366; margin: 15px 0 8px 0; text-align: center; font-weight: 700; }
 
-/* Botão de Impressão */
+.container-unidade h3 { font-size: 13px; color: #003366; margin: 15px 0 8px 0; text-align: center; font-weight: 700; }
+.legenda-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.expander { background: #F3F4F6; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; border: 1px solid #D1D5DB; }
+
+/* Botão de Ação Principal */
 .print-btn {
     background-color: #FFCC00; color: #003366; border: 2px solid #003366;
     padding: 10px 20px; border-radius: 6px; font-weight: 700;
     font-size: 14px; cursor: pointer; width: 100%; height: 42px;
 }
 
-.legenda-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.expander { background: #F3F4F6; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; border: 1px solid #D1D5DB; }
+/* ==========================================================================
+   REGRAS COMPLETA DE IMPRESSÃO (FIDELIDADE DE LAYOUT)
+   ========================================================================== */
+@page { 
+    size: A4 portrait; 
+    margin: 10mm 12mm; 
+}
 
-/* REGRAS EXCLUSIVAS PARA IMPRESSÃO */
-@page { size: auto; margin: 10mm 15mm 10mm 15mm !important; }
 @media print {
-    .no-print, button, .main-tabs, .user-header, .print-btn { display: none !important; }
-    body { background-color: #ffffff !important; color: #000000 !important; padding: 0 !important; }
-    .moldura-cesta { border: 2px solid #003366 !important; background-color: #F8F9FA !important; page-break-inside: avoid !important; }
-    .linha-cesta { background-color: #FFFFFF !important; border: 1px dashed #BDC3C7 !important; overflow: visible !important; }
-    .container-unidade { page-break-inside: avoid !important; margin-bottom: 30px !important; }
+    /* Força os navegadores a renderizarem cores de fundo e sombreados */
+    html, body { 
+        background-color: #ffffff !important; 
+        color: #000000 !important; 
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact !important; 
+        print-color-adjust: exact !important;
+    }
+
+    /* Oculta o que não deve sair no documento impresso */
+    .no-print, button, .main-tabs, .user-header, .print-btn, .tabs-auth, .auth-form-content { 
+        display: none !important; 
+    }
+
+    /* Mantém o grid e a moldura visível e sem quebras de página erradas */
+    .moldura-cesta { 
+        border: 2px solid #003366 !important; 
+        background-color: #F8F9FA !important; 
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    .linha-cesta { 
+        background-color: #FFFFFF !important; 
+        border: 1px dashed #BDC3C7 !important; 
+        display: flex !important;
+        flex-wrap: wrap !important;
+        overflow: visible !important; 
+    }
+
+    .bloco-ferramenta {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        box-shadow: none !important;
+        border: 1px solid #333333 !important;
+    }
+
+    .container-unidade { 
+        page-break-inside: avoid !important; 
+        break-inside: avoid !important;
+        margin-bottom: 25px !important; 
+    }
+
+    table {
+        page-break-inside: auto;
+    }
+    tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+    }
 }
