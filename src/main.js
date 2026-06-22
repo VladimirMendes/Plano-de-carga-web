@@ -1,4 +1,6 @@
-// Dados e Estados Iniciais Padrão
+// ==========================================================================
+// CONFIGURAÇÕES, DADOS E ESTADOS INICIAIS PADRÃO
+// ==========================================================================
 const FERRAMENTAS_PADRAO = [
     {"nome": "TOOL",   "comp": 3.50, "peso": 600.0, "larg": 0.80},
     {"nome": "TOOL2",  "comp": 3.50, "peso": 440.0, "larg": 0.80},
@@ -21,6 +23,9 @@ window.addEventListener('DOMContentLoaded', () => {
     verificarSessao();
 });
 
+// ==========================================================================
+// CONTROLE DE SESSÃO E INTERFACE (AUTENTICAÇÃO)
+// ==========================================================================
 function verificarSessao() {
     const logado = sessionStorage.getItem("user_ativo");
     if (logado) {
@@ -104,6 +109,9 @@ function executarLogout() {
     location.reload();
 }
 
+// ==========================================================================
+// GERENCIAMENTO DE CONFIGURAÇÕES E MEMÓRIA
+// ==========================================================================
 function carregarConfigInterface() {
     const configCompleta = carregarJSONSeguro(KEY_CONFIG, {});
     if (!configCompleta[currentUser.email]) {
@@ -228,7 +236,7 @@ function renderizarListaContainers() {
     });
 }
 
-function ativarContainer(idx) {
+function activarContainer(idx) {
     const db = carregarJSONSeguro(KEY_CONTAINERS, {});
     const cnt = db[currentUser.email][idx];
     const configCompleta = carregarJSONSeguro(KEY_CONFIG, {});
@@ -249,113 +257,166 @@ function removerContainer(idx) {
     renderizarListaContainers();
 }
 
+// ==========================================================================
+// PROCESSAMENTO DO NOVO ALGORITMO AUTÔNOMO 2D E BALANÇO DE TORQUES
+// ==========================================================================
 function acionarCalculoGeral() {
     const configCompleta = carregarJSONSeguro(KEY_CONFIG, {});
     const cfg = configCompleta[currentUser.email] || CONFIG_PADRAO;
-    const res = calcularPlanoCarga(cfg, equipamentosMemoria);
-    
-    // Processamento de KPIs
-    const totalEquip = res.ferramentas.length;
-    const pesoTotal = res.ferramentas.reduce((a,c) => a + c[2], 0);
-    const numContainers = res.permitirCamadas ? 1 : res.cestas.length;
-    
-    document.getElementById("kpi-container").innerHTML = `
-        <div class="kpi-card"><span>Total Equipamentos</span><h2>${totalEquip} UNID</h2></div>
-        <div class="kpi-card"><span>Peso Total Geral</span><h2>${pesoTotal.toLocaleString()} KG</h2></div>
-        <div class="kpi-card"><span>Contentores Exigidos</span><h2>${numContainers} UNID</h2></div>
-        <div class="kpi-card"><span>Balanceamento</span><h2 style="color:#117A65;">100% ESTÁVEL</h2></div>
-    `;
 
-    // Processar e preencher a Tabela e os Gráficos Visuais
+    const largMaxContainer = parseFloat(cfg.larg || 2.0);
+    const compMaxContainer = parseFloat(cfg.comp || 12.0);
+    const permitirCamadas = document.getElementById("cfg-camadas").checked;
+
+    // Ordenar equipamentos por peso de forma decrescente para garantir estabilidade da base
+    let ferramentasGerais = [...equipamentosMemoria].sort((a, b) => b.peso - a.peso);
+
     const tbody = document.getElementById("tabela-cartesia-body");
     tbody.innerHTML = "";
     const graficosContainer = document.getElementById("graficos-container");
     graficosContainer.innerHTML = "";
 
+    let camadasCestas = [];
+    let camadaAtual = [];
+    
+    let xAtual = 0.0;
+    let yAtual = 0.0;
+    let maiorCompLinhaAtual = 0.0;
+
+    // Eixos centrais geométricos do container para cálculo do momento de torque
+    const centroXContainer = largMaxContainer / 2;
+    const centroYContainer = compMaxContainer / 2;
+
+    // Distribuição dinâmica bidimensional (Grade Espacial Autônoma)
+    ferramentasGears.forEach((eq) => {
+        // Se ultrapassar a largura máxima ao lado, quebra para uma nova fileira de comprimento (Y)
+        if (xAtual + eq.larg > largMaxContainer) {
+            yAtual += maiorCompLinhaAtual + 0.05; // Margem de segurança de 5cm
+            xAtual = 0.0;
+            maiorCompLinhaAtual = 0.0;
+        }
+
+        // Se estourar o comprimento máximo do contêiner, cria uma nova Camada/Cesta separada
+        if (yAtual + eq.comp > compMaxContainer) {
+            camadasCestas.push(camadaAtual);
+            camadaAtual = [];
+            xAtual = 0.0;
+            yAtual = 0.0;
+            maiorCompLinhaAtual = 0.0;
+        }
+
+        // Define a localização do baricentro (centro) físico do item alocado
+        let posX = xAtual + (eq.larg / 2);
+        let posY = yAtual + (eq.comp / 2);
+
+        // Braço de alavanca com base no centro do container para cálculo correto de Torque
+        let torqueX = eq.peso * (posX - centroXContainer);
+        let torqueY = eq.peso * (posY - centroYContainer);
+
+        camadaAtual.push({
+            nome: eq.nome,
+            comp: eq.comp,
+            larg: eq.larg,
+            peso: eq.peso,
+            posX: posX,
+            posY: posY,
+            torqueX: torqueX,
+            torqueY: torqueY,
+            xInicio: xAtual
+        });
+
+        if (eq.comp > maiorCompLinhaAtual) {
+            maiorCompLinhaAtual = eq.comp;
+        }
+        xAtual += eq.larg + 0.05; // Margem de segurança na largura
+    });
+
+    if (camadaAtual.length > 0) {
+        camadasCestas.push(camadaAtual);
+    }
+
+    // Processamento de indicadores gerais (KPIs)
+    const totalEquip = equipamentosMemoria.length;
+    const pesoTotalGeral = equipamentosMemoria.reduce((a, c) => a + c.peso, 0);
+    const numContainersExigidos = permitirCamadas ? 1 : camadasCestas.length;
+
+    document.getElementById("kpi-container").innerHTML = `
+        <div class="kpi-card"><span>Total Equipamentos</span><h2>${totalEquip} UNID</h2></div>
+        <div class="kpi-card"><span>Peso Total Geral</span><h2>${pesoTotalGeral.toLocaleString()} KG</h2></div>
+        <div class="kpi-card"><span>Contentores Exigidos</span><h2>${numContainersExigidos} UNID</h2></div>
+        <div class="kpi-card"><span>Balanceamento</span><h2 style="color:#117A65;">100% ESTÁVEL</h2></div>
+    `;
+
     let listaLogistica = [];
-    const dbContainers = carregarJSONSeguro(KEY_CONTAINERS, {});
-    const invContainers = dbContainers[currentUser.email] || [];
 
-    res.cestas.forEach((itensCesta, idxCesta) => {
-        let lado_a = [], lado_b = [];
-        let pa = 0, pb = 0;
-        for (let it of itensCesta) {
-            if (pa <= pb) { lado_a.push(it); pa += it[2]; }
-            else { lado_b.push(it); pb += it[2]; }
-        }
+    // Renderizar dados cartesianos na tabela e blocos de visualização gráfica
+    camadasCestas.forEach((itensCesta, idx) => {
+        let tagDet = cfg.tag || "CBR-01";
+        let tagFinal = permitirCamadas && camadasCestas.length > 1 ? `${tagDet} (${idx + 1}ª Camada)` : `${tagDet}`;
+        
+        let comprimentoUtilizadoNaCesta = Math.max(...itensCesta.map(i => i.posY + (i.comp / 2)));
+        let [valComercial, txtComercial] = sugerirTamanhoComercial(comprimentoUtilizadoNaCesta);
+        listaLogistica.push(`${tagFinal} [${txtComercial}]`);
 
-        let comp_a = lado_a.reduce((a,c) => a+c[1],0) + (lado_a.length * 0.1);
-        let comp_b = lado_b.reduce((a,c) => a+c[1],0) + (lado_b.length * 0.1);
-        let max_comp = Math.max(comp_a, comp_b);
-        let [val_com, txt_com] = sugerirTamanhoComercial(max_comp);
+        // Popular a tabela dinâmica na interface
+        itensCesta.forEach(item => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td>${tagFinal}</td>
+                <td><b>${item.nome}</b></td>
+                <td>${item.comp.toFixed(2)}</td>
+                <td>${item.larg.toFixed(2)}</td>
+                <td>${item.peso.toFixed(0)}</td>
+                <td>${item.posX.toFixed(2)}</td>
+                <td>${item.posY.toFixed(2)}</td>
+                <td>${item.torqueX.toFixed(1)}</td>
+                <td>${item.torqueY.toFixed(1)}</td>
+            `;
+            tbody.appendChild(row);
+        });
 
-        let tag_det = "";
-        invContainers.sort((a,b) => a.comp - b.comp);
-        for(let cnt of invContainers) {
-            if (cnt.comp >= val_com) { tag_det = cnt.tag; break; }
-        }
-        if(!tag_det) tag_det = cfg.tag || "CBR-01";
+        // Geração do Painel Visual Autônomo com representação 2D proporcional via CSS
+        let tituloGrafico = permitirCamadas && camadasCestas.length > 1 ? 
+            `${tagFinal.toUpperCase()} - COMPRIMENTO MÁXIMO DA CAMADA: ${comprimentoUtilizadoNaCesta.toFixed(2)}m` : 
+            `${tagFinal.toUpperCase()} - COMPRIMENTO EXIGIDO DO CONTENTOR: ${txtComercial}`;
 
-        let tagFinal = res.permitirCamadas ? `${tag_det} (${idxCesta + 1}ª Camada)` : tag_det;
-        listaLogistica.push(`${tagFinal} [${txt_com}]`);
+        let htmlGraf = `<div class="container-unidade"><h3>${tituloGrafico}</h3><div class="moldura-cesta">`;
+        
+        // Agrupa elementos que pertencem à mesma fileira aproximada em Y para renderização
+        let fileirasMap = {};
+        itensCesta.forEach(item => {
+            let chaveFileira = Math.floor(item.posY - (item.comp / 2));
+            if (!fileirasMap[chaveFileira]) fileirasMap[chaveFileira] = [];
+            fileirasMap[chaveFileira].push(item);
+        });
 
-        // Função interna para alocar e calcular torques cartesianos
-        function alocarEixoY(listaLado, sx, nomesAcum) {
-            let ponteiro = 0.0;
-            for(let item of listaLado) {
-                let [n, c, p, l] = item;
-                let px = res.cx + (sx * (l / 2 + 0.20));
-                let py = ponteiro + (c / 2);
-                let tx = p * (px - res.cx);
-                let ty = p * (py - res.cy);
-
-                const row = document.createElement("tr");
-                row.innerHTML = `
-                    <td>${tagFinal}</td><td><b>${n}</b></td><td>${c.toFixed(2)}</td>
-                    <td>${l.toFixed(2)}</td><td>${p.toFixed(0)}</td><td>${px.toFixed(2)}</td>
-                    <td>${py.toFixed(2)}</td><td>${tx.toFixed(1)}</td><td>${ty.toFixed(1)}</td>
-                `;
-                tbody.appendChild(row);
-                nomesAcum.push({n, c});
-                ponteiro += c + 0.10;
-            }
-        }
-
-        let nomesA = [], nomesB = [];
-        alocarEixoY(lado_a, -1, nomesA);
-        alocarEixoY(lado_b, 1, nomesB);
-
-        // Renderização do HTML do Gráfico da Cesta
-        let compEscala = Math.max(res.C_CESTA, max_comp);
-        let titulo = res.permitirCamadas ? 
-            `${tagFinal.toUpperCase()} - COMPRIMENTO EXIGIDO DA CAMADA: ${txt_com}` : 
-            `${tagFinal.toUpperCase()} - COMPRIMENTO EXIGIDO DO CONTENTOR: ${txt_com}`;
-
-        let htmlGraf = `<div class="container-unidade"><h3>${titulo}</h3><div class="moldura-cesta">`;
-        [nomesA, nomesB].forEach(ladoItens => {
+        Object.keys(fileirasMap).sort((a,b) => a - b).forEach(chave => {
             htmlGraf += `<div class="linha-cesta">`;
-            ladoItens.forEach(item => {
-                let pref = prefixoCor(item.n);
+            fileirasMap[chave].forEach(item => {
+                let pref = prefixoCor(item.nome);
                 let cor = CORES_MATERIALS[pref] || DEFAULT_COLOR;
-                let larguraPct = (item.c / compEscala) * 100;
-                htmlGraf += `<div class="bloco-ferramenta" style="background-color: ${cor}; width: ${larguraPct}%;">${item.n}</div>`;
+                // Escala percentual com base na largura máxima configurada do contêiner (ex: 2m)
+                let larguraProporcionalPct = (item.larg / largMaxContainer) * 100;
+                htmlGraf += `<div class="bloco-ferramenta" style="background-color: ${cor}; width: ${larguraProporcionalPct}%; min-width: max-content;">${item.nome} (${item.larg.toFixed(2)}m)</div>`;
             });
             htmlGraf += `</div>`;
         });
+
         htmlGraf += `</div></div>`;
         graficosContainer.innerHTML += htmlGraf;
     });
 
     const txtAlerta = "LOGÍSTICA: Requisitar " + listaLogistica.join(", ");
-    const corAlerta = numContainers === 1 ? "#2ECC71" : "#D35400";
-    const prefixo = numContainers === 1 ? "✅" : "⚠️";
+    const corAlerta = numContainersExigidos === 1 ? "#2ECC71" : "#D35400";
+    const prefixoSymbol = numContainersExigidos === 1 ? "✅" : "⚠️";
     const divAlerta = document.getElementById("alerta-logistica");
     divAlerta.style.backgroundColor = corAlerta;
-    divAlerta.innerText = `${prefixo} ${txtAlerta.toUpperCase()}`;
+    divAlerta.innerText = `${prefixoSymbol} ${txtAlerta.toUpperCase()}`;
 }
 
 function inicializarLegendas() {
     const leg = document.getElementById("legenda-cores");
+    if (!leg) return;
     leg.innerHTML = "";
     for(let pref in CORES_MATERIALS) {
         leg.innerHTML += `<div style="background-color:${CORES_MATERIALS[pref]}; color:white; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:700; text-shadow:0 1px 2px rgba(0,0,0,0.3);">${pref}</div>`;
