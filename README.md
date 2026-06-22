@@ -3,6 +3,7 @@ O objetivo principal é calcular, organizar e renderizar graficamente a disposi�
 
 📋 SUMÁRIO EXECUTIVO: PLANO DE CARGA OFFSHORE ESTÁTICO
 A aplicação foi migrada de uma infraestrutura baseada em servidor (Streamlit) para uma solução 100% Client-Side hospedada no GitHub Pages. Toda a lógica de processamento matemático, renderização e persistência de dados ocorre em tempo de execução no navegador do usuário.
+
 🏗️ PILAR 1: Estrutura de Arquivos e Divisão de Responsabilidades
 O projeto está modularizado dentro do repositório para garantir fácil manutenção, separando a estrutura (HTML), a estética (CSS) e o comportamento (JS) de forma limpa:
 
