@@ -249,21 +249,274 @@ function removerContainer(idx) {
     renderizarListaContainers();
 }
 
+// ============================================================
+// CLASSE GRADE BIDIMENSIONAL DINÂMICA (X, Y)
+// ============================================================
+class GradeContainer2D {
+    constructor(largura, comprimento, resolucao = 0.10) {
+        // Dimensões em metros
+        this.largura = largura;      // Eixo X (largura do container)
+        this.comprimento = comprimento; // Eixo Y (comprimento do container)
+        this.resolucao = resolucao;  // Tamanho da célula da grade em metros
+        
+        // Centro do container
+        this.cx = largura / 2;
+        this.cy = comprimento / 2;
+        
+        // Grade: array 2D [y][x], null = vazio
+        this.cols = Math.ceil(largura / resolucao);
+        this.rows = Math.ceil(comprimento / resolucao);
+        this.grid = Array.from({ length: this.rows }, () => Array(this.cols).fill(null));
+        
+        // Itens posicionados: array de objetos {nome, comp, peso, larg, x, y, px, py}
+        this.itens = [];
+    }
+
+    // Converte coordenadas reais (metros) para índices da grade
+    realParaGrid(x, y) {
+        const gx = Math.floor(x / this.resolucao);
+        const gy = Math.floor(y / this.resolucao);
+        return { gx, gy };
+    }
+
+    // Converte índices da grade para coordenadas reais (centro da célula)
+    gridParaReal(gx, gy) {
+        const x = (gx + 0.5) * this.resolucao;
+        const y = (gy + 0.5) * this.resolucao;
+        return { x, y };
+    }
+
+    // Verifica se uma área retangular está livre na grade
+    areaLivre(x, y, largura, comprimento) {
+        const { gx: startX, gy: startY } = this.realParaGrid(x, y);
+        const { gx: endX, gy: endY } = this.realParaGrid(x + largura, y + comprimento);
+        
+        for (let gy = startY; gy <= endY && gy < this.rows; gy++) {
+            for (let gx = startX; gx <= endX && gx < this.cols; gx++) {
+                if (gy < 0 || gx < 0 || this.grid[gy][gx] !== null) return false;
+            }
+        }
+        return true;
+    }
+
+    // Marca uma área na grade como ocupada
+    ocuparArea(x, y, largura, comprimento, item) {
+        const { gx: startX, gy: startY } = this.realParaGrid(x, y);
+        const { gx: endX, gy: endY } = this.realParaGrid(x + largura, y + comprimento);
+        
+        for (let gy = startY; gy <= endY && gy < this.rows; gy++) {
+            for (let gx = startX; gx <= endX && gx < this.cols; gx++) {
+                if (gy >= 0 && gx >= 0) this.grid[gy][gx] = item;
+            }
+        }
+    }
+
+    // Encontra posição livre para um item usando heurística de melhor encaixe
+    // Retorna {x, y, px, py} ou null se não couber
+    encontrarPosicao(item) {
+        const [nome, comp, peso, larg] = item;
+        
+        // Heurística: tentar posicionar próximo ao centro para balanceamento
+        // Varredura em espiral a partir do centro
+        const centros = [];
+        for (let gy = 0; gy < this.rows; gy++) {
+            for (let gx = 0; gx < this.cols; gx++) {
+                const { x, y } = this.gridParaReal(gx, gy);
+                // Distância ao centro do container
+                const distCentro = Math.sqrt((x - this.cx)**2 + (y - this.cy)**2);
+                centros.push({ gx, gy, x, y, distCentro });
+            }
+        }
+        
+        // Ordenar por proximidade ao centro (balanceamento)
+        centros.sort((a, b) => a.distCentro - b.distCentro);
+        
+        for (const pos of centros) {
+            // Tentar posicionar com o item alinhado ao eixo Y (comprimento)
+            const x = pos.x - larg / 2;
+            const y = pos.y;
+            
+            if (x >= 0 && y >= 0 && x + larg <= this.largura && y + comp <= this.comprimento) {
+                if (this.areaLivre(x, y, larg, comp)) {
+                    const px = x + larg / 2;  // Centro de massa X
+                    const py = y + comp / 2;  // Centro de massa Y
+                    return { x, y, px, py };
+                }
+            }
+            
+            // Tentar rotacionado (largura e comprimento trocados)
+            if (larg !== comp) {
+                const xRot = pos.x - comp / 2;
+                const yRot = pos.y;
+                if (xRot >= 0 && yRot >= 0 && xRot + comp <= this.largura && yRot + larg <= this.comprimento) {
+                    if (this.areaLivre(xRot, yRot, comp, larg)) {
+                        const px = xRot + comp / 2;
+                        const py = yRot + larg / 2;
+                        return { x: xRot, y: yRot, px, py, rotacionado: true };
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    // Posiciona um item na grade
+    posicionar(item) {
+        const pos = this.encontrarPosicao(item);
+        if (!pos) return null;
+        
+        const [nome, comp, peso, larg] = item;
+        const dimX = pos.rotacionado ? comp : larg;
+        const dimY = pos.rotacionado ? larg : comp;
+        
+        this.ocuparArea(pos.x, pos.y, dimX, dimY, nome);
+        
+        const itemPosicionado = {
+            nome, comp, peso, larg,
+            x: pos.x, y: pos.y,
+            px: pos.px, py: pos.py,
+            rotacionado: pos.rotacionado || false
+        };
+        
+        this.itens.push(itemPosicionado);
+        return itemPosicionado;
+    }
+
+    // Calcula torque em relação ao centro do container
+    calcularTorque() {
+        let torqueX = 0, torqueY = 0;
+        for (const item of this.itens) {
+            torqueX += item.peso * (item.px - this.cx);
+            torqueY += item.peso * (item.py - this.cy);
+        }
+        return { torqueX, torqueY };
+    }
+
+    // Calcula centro de massa
+    calcularCentroMassa() {
+        let pesoTotal = 0, momentoX = 0, momentoY = 0;
+        for (const item of this.itens) {
+            pesoTotal += item.peso;
+            momentoX += item.peso * item.px;
+            momentoY += item.peso * item.py;
+        }
+        return {
+            cx: pesoTotal > 0 ? momentoX / pesoTotal : this.cx,
+            cy: pesoTotal > 0 ? momentoY / pesoTotal : this.cy,
+            pesoTotal
+        };
+    }
+
+    // Verifica estabilidade (torque dentro de limites aceitáveis)
+    verificarEstabilidade(toleranciaPercentual = 5) {
+        const { torqueX, torqueY } = this.calcularTorque();
+        const cm = this.calcularCentroMassa();
+        const maxTorqueX = (this.itens.reduce((s, i) => s + i.peso, 0) * this.largura / 2) * (toleranciaPercentual / 100);
+        const maxTorqueY = (this.itens.reduce((s, i) => s + i.peso, 0) * this.comprimento / 2) * (toleranciaPercentual / 100);
+        
+        return {
+            estavel: Math.abs(torqueX) <= maxTorqueX && Math.abs(torqueY) <= maxTorqueY,
+            torqueX, torqueY,
+            maxTorqueX, maxTorqueY,
+            desvioX: cm.cx - this.cx,
+            desvioY: cm.cy - this.cy
+        };
+    }
+
+    // Taxa de ocupação da área
+    taxaOcupacao() {
+        const areaTotal = this.largura * this.comprimento;
+        const areaOcupada = this.itens.reduce((s, i) => s + (i.comp * i.larg), 0);
+        return (areaOcupada / areaTotal) * 100;
+    }
+}
+
+// ============================================================
+// FUNÇÃO DE CÁLCULO REFATORADA
+// ============================================================
+function calcularPlanoCarga2D(cfg, ferramentas) {
+    const largura = parseFloat(cfg.larg);
+    const comprimento = parseFloat(cfg.comp);
+    const cargaMax = parseInt(cfg.carga);
+    const permitirCamadas = cfg.camadas;
+    
+    // Ordenar ferramentas: maiores primeiro (best-fit decreasing)
+    const itens = ferramentas.map(f => [f.nome, f.comp, f.peso, f.larg])
+        .sort((a, b) => (b[1] * b[3]) - (a[1] * a[3])); // Ordena por área decrescente
+    
+    const cestas = [];
+    let itensRestantes = [...itens];
+    
+    while (itensRestantes.length > 0) {
+        const grade = new GradeContainer2D(largura, comprimento);
+        const cestaAtual = [];
+        let pesoAtual = 0;
+        
+        // Tentar posicionar cada item restante
+        for (let i = 0; i < itensRestantes.length; i++) {
+            const item = itensRestantes[i];
+            const pesoItem = item[2];
+            
+            if (pesoAtual + pesoItem > cargaMax) continue;
+            
+            const posicionado = grade.posicionar(item);
+            if (posicionado) {
+                cestaAtual.push(posicionado);
+                pesoAtual += pesoItem;
+                itensRestantes.splice(i, 1);
+                i--; // Ajustar índice após remoção
+            }
+        }
+        
+        if (cestaAtual.length === 0) {
+            // Item não coube em nenhum lugar — evitar loop infinito
+            console.warn("Item não cabe no container:", itensRestantes[0]);
+            break;
+        }
+        
+        cestas.push({
+            itens: cestaAtual,
+            grade: grade,
+            pesoTotal: pesoAtual
+        });
+        
+        if (!permitirCamadas) break;
+    }
+    
+    return {
+        cestas,
+        permitirCamadas,
+        ferramentas: itens,
+        largura,
+        comprimento,
+        cargaMax
+    };
+}
+
 function acionarCalculoGeral() {
     const configCompleta = carregarJSONSeguro(KEY_CONFIG, {});
     const cfg = configCompleta[currentUser.email] || CONFIG_PADRAO;
-    const res = calcularPlanoCarga(cfg, equipamentosMemoria);
+    
+    // Usar o novo cálculo 2D
+    const res = calcularPlanoCarga2D(cfg, equipamentosMemoria);
     
     // Processamento de KPIs
     const totalEquip = res.ferramentas.length;
-    const pesoTotal = res.ferramentas.reduce((a,c) => a + c[2], 0);
-    const numContainers = res.permitirCamadas ? 1 : res.cestas.length;
+    const pesoTotal = res.ferramentas.reduce((a, c) => a + c[2], 0);
+    const numContainers = res.permitirCamadas ? res.cestas.length : 1;
+    
+    // Verificar estabilidade de todas as cestas
+    let todasEstaveis = true;
+    for (const cesta of res.cestas) {
+        const estab = cesta.grade.verificarEstabilidade();
+        if (!estab.estavel) todasEstaveis = false;
+    }
     
     document.getElementById("kpi-container").innerHTML = `
         <div class="kpi-card"><span>Total Equipamentos</span><h2>${totalEquip} UNID</h2></div>
         <div class="kpi-card"><span>Peso Total Geral</span><h2>${pesoTotal.toLocaleString()} KG</h2></div>
         <div class="kpi-card"><span>Contentores Exigidos</span><h2>${numContainers} UNID</h2></div>
-        <div class="kpi-card"><span>Balanceamento</span><h2 style="color:#117A65;">100% ESTÁVEL</h2></div>
+        <div class="kpi-card"><span>Balanceamento</span><h2 style="color:${todasEstaveis ? '#117A65' : '#D35400'};">${todasEstaveis ? '100% ESTÁVEL' : '⚠️ REVISAR'}</h2></div>
     `;
 
     // Processar e preencher a Tabela e os Gráficos Visuais
@@ -276,21 +529,19 @@ function acionarCalculoGeral() {
     const dbContainers = carregarJSONSeguro(KEY_CONTAINERS, {});
     const invContainers = dbContainers[currentUser.email] || [];
 
-    res.cestas.forEach((itensCesta, idxCesta) => {
-        let lado_a = [], lado_b = [];
-        let pa = 0, pb = 0;
-        for (let it of itensCesta) {
-            if (pa <= pb) { lado_a.push(it); pa += it[2]; }
-            else { lado_b.push(it); pb += it[2]; }
-        }
-
-        let comp_a = lado_a.reduce((a,c) => a+c[1],0) + (lado_a.length * 0.1);
-        let comp_b = lado_b.reduce((a,c) => a+c[1],0) + (lado_b.length * 0.1);
-        let max_comp = Math.max(comp_a, comp_b);
-        let [val_com, txt_com] = sugerirTamanhoComercial(max_comp);
+    res.cestas.forEach((cesta, idxCesta) => {
+        const grade = cesta.grade;
+        const itens = cesta.itens;
+        
+        // Calcular dimensões necessárias
+        const maxX = Math.max(...itens.map(i => i.x + i.larg));
+        const maxY = Math.max(...itens.map(i => i.y + i.comp));
+        const maxComp = Math.max(maxX, maxY); // Maior dimensão usada
+        
+        let [val_com, txt_com] = sugerirTamanhoComercial(maxComp);
 
         let tag_det = "";
-        invContainers.sort((a,b) => a.comp - b.comp);
+        invContainers.sort((a, b) => a.comp - b.comp);
         for(let cnt of invContainers) {
             if (cnt.comp >= val_com) { tag_det = cnt.tag; break; }
         }
@@ -299,50 +550,87 @@ function acionarCalculoGeral() {
         let tagFinal = res.permitirCamadas ? `${tag_det} (${idxCesta + 1}ª Camada)` : tag_det;
         listaLogistica.push(`${tagFinal} [${txt_com}]`);
 
-        // Função interna para alocar e calcular torques cartesianos
-        function alocarEixoY(listaLado, sx, nomesAcum) {
-            let ponteiro = 0.0;
-            for(let item of listaLado) {
-                let [n, c, p, l] = item;
-                let px = res.cx + (sx * (l / 2 + 0.20));
-                let py = ponteiro + (c / 2);
-                let tx = p * (px - res.cx);
-                let ty = p * (py - res.cy);
-
-                const row = document.createElement("tr");
-                row.innerHTML = `
-                    <td>${tagFinal}</td><td><b>${n}</b></td><td>${c.toFixed(2)}</td>
-                    <td>${l.toFixed(2)}</td><td>${p.toFixed(0)}</td><td>${px.toFixed(2)}</td>
-                    <td>${py.toFixed(2)}</td><td>${tx.toFixed(1)}</td><td>${ty.toFixed(1)}</td>
-                `;
-                tbody.appendChild(row);
-                nomesAcum.push({n, c});
-                ponteiro += c + 0.10;
-            }
+        // Preencher tabela cartesiana com dados 2D reais
+        const estab = grade.verificarEstabilidade();
+        
+        for (const item of itens) {
+            const tx = item.peso * (item.px - grade.cx);
+            const ty = item.peso * (item.py - grade.cy);
+            
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td>${tagFinal}</td>
+                <td><b>${item.nome}</b></td>
+                <td>${item.comp.toFixed(2)}</td>
+                <td>${item.larg.toFixed(2)}</td>
+                <td>${item.peso.toFixed(0)}</td>
+                <td>${item.px.toFixed(2)}</td>
+                <td>${item.py.toFixed(2)}</td>
+                <td>${tx.toFixed(1)}</td>
+                <td>${ty.toFixed(1)}</td>
+            `;
+            tbody.appendChild(row);
         }
 
-        let nomesA = [], nomesB = [];
-        alocarEixoY(lado_a, -1, nomesA);
-        alocarEixoY(lado_b, 1, nomesB);
-
-        // Renderização do HTML do Gráfico da Cesta
-        let compEscala = Math.max(res.C_CESTA, max_comp);
+        // Renderização do Gráfico 2D da Cesta
         let titulo = res.permitirCamadas ? 
-            `${tagFinal.toUpperCase()} - COMPRIMENTO EXIGIDO DA CAMADA: ${txt_com}` : 
-            `${tagFinal.toUpperCase()} - COMPRIMENTO EXIGIDO DO CONTENTOR: ${txt_com}`;
+            `${tagFinal.toUpperCase()} - DIMENSÕES EXIGIDAS DA CAMADA: ${txt_com}` : 
+            `${tagFinal.toUpperCase()} - DIMENSÕES EXIGIDAS DO CONTENTOR: ${txt_com}`;
 
-        let htmlGraf = `<div class="container-unidade"><h3>${titulo}</h3><div class="moldura-cesta">`;
-        [nomesA, nomesB].forEach(ladoItens => {
-            htmlGraf += `<div class="linha-cesta">`;
-            ladoItens.forEach(item => {
-                let pref = prefixoCor(item.n);
-                let cor = CORES_MATERIALS[pref] || DEFAULT_COLOR;
-                let larguraPct = (item.c / compEscala) * 100;
-                htmlGraf += `<div class="bloco-ferramenta" style="background-color: ${cor}; width: ${larguraPct}%;">${item.n}</div>`;
-            });
-            htmlGraf += `</div>`;
-        });
-        htmlGraf += `</div></div>`;
+        // Criar representação visual 2D
+        let htmlGraf = `<div class="container-unidade"><h3>${titulo}</h3>`;
+        
+        // Container SVG para visualização 2D
+        const escala = 400 / Math.max(grade.largura, grade.comprimento);
+        const svgWidth = grade.largura * escala;
+        const svgHeight = grade.comprimento * escala;
+        
+        htmlGraf += `<div style="position: relative; width: ${svgWidth}px; height: ${svgHeight}px; border: 2px solid #333; background: #f8f9fa; margin: 0 auto;">`;
+        
+        // Grid de fundo
+        for (let gy = 0; gy < grade.rows; gy += 5) {
+            for (let gx = 0; gx < grade.cols; gx += 5) {
+                const { x, y } = grade.gridParaReal(gx, gy);
+                htmlGraf += `<div style="position: absolute; left: ${x * escala}px; top: ${y * escala}px; width: ${5 * grade.resolucao * escala}px; height: ${5 * grade.resolucao * escala}px; border: 1px dashed #ddd;"></div>`;
+            }
+        }
+        
+        // Centro do container
+        htmlGraf += `<div style="position: absolute; left: ${(grade.cx * escala) - 4}px; top: ${(grade.cy * escala) - 4}px; width: 8px; height: 8px; background: red; border-radius: 50%; z-index: 10;" title="Centro do Container"></div>`;
+        
+        // Centro de massa
+        const cm = grade.calcularCentroMassa();
+        htmlGraf += `<div style="position: absolute; left: ${(cm.cx * escala) - 4}px; top: ${(cm.cy * escala) - 4}px; width: 8px; height: 8px; background: blue; border-radius: 50%; z-index: 10;" title="Centro de Massa"></div>`;
+        
+        // Itens posicionados
+        for (const item of itens) {
+            const pref = prefixoCor(item.nome);
+            const cor = CORES_MATERIALS[pref] || DEFAULT_COLOR;
+            const itemWidth = (item.rotacionado ? item.comp : item.larg) * escala;
+            const itemHeight = (item.rotacionado ? item.larg : item.comp) * escala;
+            
+            htmlGraf += `
+                <div style="position: absolute; left: ${item.x * escala}px; top: ${item.y * escala}px; 
+                     width: ${itemWidth}px; height: ${itemHeight}px; 
+                     background-color: ${cor}; border: 1px solid #333; 
+                     display: flex; align-items: center; justify-content: center;
+                     font-size: 10px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">
+                    ${item.nome}
+                </div>
+            `;
+        }
+        
+        htmlGraf += `</div>`;
+        
+        // Informações de estabilidade
+        htmlGraf += `<div style="margin-top: 10px; font-size: 12px; text-align: center;">`;
+        htmlGraf += `Centro de Massa: (${cm.cx.toFixed(2)}, ${cm.cy.toFixed(2)}) | `;
+        htmlGraf += `Peso: ${cesta.pesoTotal.toFixed(0)}kg | `;
+        htmlGraf += `Ocupação: ${grade.taxaOcupacao().toFixed(1)}% | `;
+        htmlGraf += `Estável: ${estab.estavel ? '✅' : '⚠️'}`;
+        htmlGraf += `</div>`;
+        
+        htmlGraf += `</div>`;
         graficosContainer.innerHTML += htmlGraf;
     });
 
