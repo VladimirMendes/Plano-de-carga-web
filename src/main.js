@@ -236,7 +236,7 @@ function renderizarListaContainers() {
     });
 }
 
-function activarContainer(idx) {
+function ativarContainer(idx) {
     const db = carregarJSONSeguro(KEY_CONTAINERS, {});
     const cnt = db[currentUser.email][idx];
     const configCompleta = carregarJSONSeguro(KEY_CONFIG, {});
@@ -258,7 +258,7 @@ function removerContainer(idx) {
 }
 
 // ==========================================================================
-// PROCESSAMENTO DO NOVO ALGORITMO AUTÔNOMO 2D E BALANÇO DE TORQUES
+// PROCESSAMENTO DO ALGORITMO AUTÔNOMO 2D E BALANÇO DE TORQUES (CORRIGIDO)
 // ==========================================================================
 function acionarCalculoGeral() {
     const configCompleta = carregarJSONSeguro(KEY_CONFIG, {});
@@ -288,7 +288,7 @@ function acionarCalculoGeral() {
     const centroYContainer = compMaxContainer / 2;
 
     // Distribuição dinâmica bidimensional (Grade Espacial Autônoma)
-    ferramentasGears.forEach((eq) => {
+    ferramentasGerais.forEach((eq) => {
         // Se ultrapassar a largura máxima ao lado, quebra para uma nova fileira de comprimento (Y)
         if (xAtual + eq.larg > largMaxContainer) {
             yAtual += maiorCompLinhaAtual + 0.05; // Margem de segurança de 5cm
