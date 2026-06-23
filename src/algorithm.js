@@ -29,123 +29,90 @@ function calcularPlanoCarga(configDb, ferramentasLista) {
     let L_CESTA = parseFloat(configDb.larg) || 2.5;
     let C_CESTA = parseFloat(configDb.comp) || 12.0;
     let cargaUtilMax = parseFloat(configDb.carga) || 7000.0;
-    let taraCesta = parseFloat(configDb.tara) || 2000.0; // Adicionado: tara padrão da cesta
-    let numPernas = parseInt(configDb.pernas) || 4;       // Adicionado: pernas de içamento
-    let anguloIçamento = parseFloat(configDb.angulo) || 60; // Adicionado: ângulo com a horizontal
+    let taraCesta = parseFloat(configDb.tara) || 2000.0; 
+    let numPernas = parseInt(configDb.pernas) || 4;       
+    let anguloIçamento = parseFloat(configDb.angulo) || 60; 
     
     let cx = L_CESTA / 2;
     let cy = C_CESTA / 2;
+    const ESPACAMENTO = 0.05; // 5cm de folga de segurança entre ferramentas
 
-    // Filtra e mapeia ferramentas válidas
+    // Filtra e mapeia as ferramentas informadas pelo usuário
     let ferramentas = ferramentasLista
         .filter(it => it.nome)
-        .map(it => {
-            return {
-                nome: String(it.nome),
-                comp: parseFloat(it.comp) || 0,
-                peso: parseFloat(it.peso) || 0,
-                larg: parseFloat(it.larg) || 0.3 // Largura padrão se não informada
-            };
-        });
+        .map(it => ({
+            nome: String(it.nome),
+            comp: parseFloat(it.comp) || 0,
+            peso: parseFloat(it.peso) || 0,
+            larg: parseFloat(it.larg) || 0.3
+        }));
     
-    // Ordenação estável por peso decrescente
-    ferramentas.sort((a, b) => b.peso - a.peso);
+    // Ordenação estratégica: Prioriza itens mais compridos e mais pesados para a base
+    ferramentas.sort((a, b) => (b.comp * b.larg) - (a.comp * a.larg) || (b.peso - a.peso));
 
     let resultadoCestas = [];
 
     for (let it of ferramentas) {
         let alocado = false;
 
-        for (let cesta de resultadoCestas) {
-            // Calcula o peso atual alocado nesta cesta
+        // Tenta encaixar a ferramenta em alguma cesta já existente
+        for (let cesta of resultadoCestas) {
             let peso_atual = cesta.itens.reduce((acc, curr) => acc + curr.peso, 0);
+            
+            // Restrição de Capacidade de Carga de Segurança
+            if (peso_atual + it.peso > cargaUtilMax) continue;
 
-            // Simulação de posicionamento usando a heurística de duas colunas (Lado A e Lado B)
-            let lado_a = [], lado_b = [];
-            let pa = 0, pb = 0;
-
-            for (let existente of cesta.itens) {
-                if (pa <= pb) { lado_a.push(existente); pa += existente.peso; }
-                else { lado_b.push(existente); pb += existente.peso; }
-            }
-
-            // Testa o novo item temporariamente no lado mais leve
-            if (pa <= pb) lado_a.push(it);
-            else lado_b.push(it);
-
-            // Calcula o comprimento necessário para cada lado considerando espaçamento de 10cm
-            let comp_a = lado_a.reduce((acc, curr) => acc + curr.comp, 0) + (lado_a.length * 0.1);
-            let comp_b = lado_b.reduce((acc, curr) => acc + curr.comp, 0) + (lado_b.length * 0.1);
-            let max_comp = Math.max(comp_a, comp_b);
-
-            // Verifica restrições de espaço e capacidade de carga útil
-            if ((peso_atual + it.peso <= cargaUtilMax) && (max_comp <= C_CESTA)) {
-                cesta.itens.push(it);
+            // Executa o algoritmo de empacotamento 2D dinâmico baseado em prateleiras adaptativas
+            let vagaEncontrada = encontrarVaga2D(cesta.itens, it, L_CESTA, C_CESTA, ESPACAMENTO);
+            
+            if (vagaEncontrada) {
+                it.x_min = vagaEncontrada.x;
+                it.y_min = vagaEncontrada.y;
+                it.x = vagaEncontrada.x + (it.larg / 2); // Centro geométrico X do item
+                it.y = vagaEncontrada.y + (it.comp / 2); // Centro geométrico Y do item
+                
+                cesta.itens.push({...it});
                 alocado = true;
                 break;
             }
         }
 
-        // Se não couber em nenhuma cesta existente, cria uma nova
+        // Se o item não coube em nenhuma cesta existente devido ao espaço 2D ou peso, abre uma nova cesta
         if (!alocado) {
-            resultadoCestas.push({ itens: [it], metricas: {} });
+            let novaCestaItens = [];
+            // O primeiro item da nova cesta sempre começa na origem (considerando a folga)
+            it.x_min = ESPACAMENTO;
+            it.y_min = ESPACAMENTO;
+            it.x = ESPACAMENTO + (it.larg / 2);
+            it.y = ESPACAMENTO + (it.comp / 2);
+            
+            novaCestaItens.push({...it});
+            resultadoCestas.push({ itens: novaCestaItens, metricas: {} });
         }
     }
 
-    // Pós-processamento: Calcula coordenadas cartesianas exatas, CG e Rigging para cada cesta
+    // Pós-processamento matemático: Centro de Gravidade Dinâmico e Rigging
     resultadoCestas.forEach(cesta => {
-        let atualY_A = 0.1;
-        let atualY_B = 0.1;
-        let pa = 0, pb = 0;
-        
         let somaMomentoX = 0;
         let somaMomentoY = 0;
         let pesoTotalFerramentas = 0;
 
-        // Atribui coordenadas cartesianas (X, Y) do centro de gravidade individual de cada ferramenta
         cesta.itens.forEach(it => {
-            let posX = 0;
-            let posY = 0;
-
-            if (pa <= pb) {
-                // Lado A (Esquerda da cesta) -> Centro em X = L_CESTA / 4
-                posX = L_CESTA / 4;
-                posY = atualY_A + (it.comp / 2);
-                atualY_A += it.comp + 0.1;
-                pa += it.peso;
-            } else {
-                // Lado B (Direita da cesta) -> Centro em X = (3 * L_CESTA) / 4
-                posX = (3 * L_CESTA) / 4;
-                posY = atualY_B + (it.comp / 2);
-                atualY_B += it.comp + 0.1;
-                pb += it.peso;
-            }
-
-            it.x = posX;
-            it.y = posY;
-
-            // Acumuladores para o cálculo do CG global
-            somaMomentoX += it.peso * posX;
-            somaMomentoY += it.peso * posY;
+            somaMomentoX += it.peso * it.x;
+            somaMomentoY += it.peso * it.y;
             pesoTotalFerramentas += it.peso;
         });
 
-        // Peso Bruto Total do Içamento
         let pesoBrutoTotal = pesoTotalFerramentas + taraCesta;
-
-        // Se a cesta estiver vazia, o CG é o centro geométrico da estrutura
         let cgX = pesoTotalFerramentas > 0 ? (somaMomentoX / pesoTotalFerramentas) : cx;
         let cgY = pesoTotalFerramentas > 0 ? (somaMomentoY / pesoTotalFerramentas) : cy;
 
-        // Cálculos de Rigging (Içamento Offshore)
-        // Converte o ângulo com a horizontal para radianos para aplicar na fórmula senoidal
+        // Cálculos de Rigging baseados em normas de Içamento Offshore
         let anguloRad = (anguloIçamento * Math.PI) / 180;
         let fatorAngulo = 1 / Math.sin(anguloRad); // FA = 1 / sen(alpha)
-
-        // Tensão teórica por perna de cabo de aço considerando distribuição simétrica ideal
         let tensaoPorPernaIdeal = (pesoBrutoTotal * fatorAngulo) / numPernas;
 
-        // Cálculo de excentricidade (distância do CG ao centro geométrico real da cesta)
+        // Excentricidade (Desvios em relação ao centro geométrico da cesta)
         let desvioX = cgX - cx;
         let desvioY = cgY - cy;
 
@@ -158,7 +125,7 @@ function calcularPlanoCarga(configDb, ferramentasLista) {
             desvioY: desvioY,
             fatorAngulo: fatorAngulo,
             tensaoPorPernaIdeal: tensaoPorPernaIdeal,
-            estabilidadeOk: Math.abs(desvioY) <= (C_CESTA * 0.1) // Tolerância de até 10% do comprimento
+            estabilidadeOk: (Math.abs(desvioY) <= (C_CESTA * 0.1)) && (Math.abs(desvioX) <= (L_CESTA * 0.1)) 
         };
     });
 
@@ -173,4 +140,43 @@ function calcularPlanoCarga(configDb, ferramentasLista) {
         cx, 
         cy 
     };
+}
+
+// Função auxiliar: Algoritmo de varredura bidimensional de geometria para localizar coordenadas (X, Y) livres
+function encontrarVaga2D(itensExistentes, novoItem, largCesta, compCesta, espacamento) {
+    // Ordena os pontos potenciais de alocação (cantos superiores e laterais dos itens existentes)
+    let pontosCandidatos = [{ x: espacamento, y: espacamento }];
+    
+    itensExistentes.forEach(it => {
+        // Ponto logo à direita do item existente
+        pontosCandidatos.push({ x: it.x_min + it.larg + espacamento, y: it.y_min });
+        // Ponto logo acima do item existente
+        pontosCandidatos.push({ x: it.x_min, y: it.y_min + it.comp + espacamento });
+    });
+
+    // Ordena os pontos candidatos para priorizar o preenchimento compacto de baixo para cima, da esquerda para a direita
+    pontosCandidatos.sort((a, b) => a.y - b.y || a.x - b.x);
+
+    for (let pt of pontosCandidatos) {
+        let x_max_item = pt.x + novoItem.larg;
+        let y_max_item = pt.y + novoItem.comp;
+
+        // Valida limites físicos das paredes da cesta
+        if (x_max_item > largCesta - espacamento || y_max_item > compCesta - espacamento) {
+            continue;
+        }
+
+        // Verifica se há colisão/sobreposição geométrica com qualquer ferramenta já alocada
+        let colisao = itensExistentes.some(existente => {
+            return !(x_max_item <= existente.x_min || 
+                     pt.x >= existente.x_min + existente.larg || 
+                     y_max_item <= existente.y_min || 
+                     pt.y >= existente.y_min + existente.comp);
+        });
+
+        if (!colisao) {
+            return pt; // Retorna a coordenada ideal encontrada
+        }
+    }
+    return null; // Não há espaço geométrico contínuo que comporte o item nesta cesta
 }
