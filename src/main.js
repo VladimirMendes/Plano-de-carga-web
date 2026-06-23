@@ -315,11 +315,9 @@ function acionarCalculoGeral() {
         let cargaMax = cargaMaxPadrao;
         let tagAtual = tagPadrao;
 
-        // Se não for a primeira partição, pesquisa no banco de dados por um contêiner alternativo
         if (!primeiraIteracao) {
             let containerEncontrado = null;
             
-            // Procura o menor contêiner cadastrado capaz de acomodar o maior dos itens restantes
             for (let cnt of listaContainersCadastrados) {
                 const maiorItemRestante = itensRestantes[0]; 
                 const cabeComprimento = cnt.comp >= maiorItemRestante[1] && cnt.larg >= maiorItemRestante[3];
@@ -445,6 +443,7 @@ function acionarCalculoGeral() {
         let htmlGraf = `<div class="container-unidade" style="margin-bottom: 30px; background: white; padding: 15px; border-radius: 6px; border: 1px solid #ddd;">`;
         htmlGraf += `<h3>📊 ${tagFinal.toUpperCase()} - PLANO DE ALOCAÇÃO E RIGGING (VISTA HORIZONTAL)</h3>`;
         
+        // AJUSTE DINÂMICO DE ESCALA: Baseia-se no comprimento real do contêiner específico desta partição
         const escala = 600 / cesta.comprimentoDoContainer; 
         const svgWidth = cesta.comprimentoDoContainer * escala; 
         const svgHeight = cesta.larguraDoContainer * escala;    
