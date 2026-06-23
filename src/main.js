@@ -258,10 +258,6 @@ function renderizarListaContainers() {
     });
 }
 
-function activarContainer(idx) {
-    ativarContainer(idx);
-}
-
 function ativarContainer(idx) {
     const db = carregarJSONSeguro(KEY_CONTAINERS, {});
     const cnt = db[currentUser.email][idx];
@@ -289,9 +285,11 @@ function acionarCalculoGeral() {
     const configCompleta = carregarJSONSeguro(KEY_CONFIG, {});
     const cfg = configCompleta[currentUser?.email] || CONFIG_PADRAO;
     
-    const largura = parseFloat(document.getElementById("cfg-larg")?.value || cfg.larg);
-    const comprimento = parseFloat(document.getElementById("cfg-comp")?.value || cfg.comp);
-    const cargaMax = parseInt(document.getElementById("cfg-carga")?.value || cfg.carga);
+    let larguraPadrao = parseFloat(document.getElementById("cfg-larg")?.value || cfg.larg);
+    let comprimentoPadrao = parseFloat(document.getElementById("cfg-comp")?.value || cfg.comp);
+    let cargaMaxPadrao = parseInt(document.getElementById("cfg-carga")?.value || cfg.carga);
+    let tagPadrao = cfg.tag || "CBR-01";
+    
     const taraCesta = parseFloat(document.getElementById("cfg-tara")?.value || cfg.tara) || 1500.0;
     const numPernas = parseInt(document.getElementById("cfg-pernas")?.value || cfg.pernas) || 4;
     const anguloIçamento = parseFloat(document.getElementById("cfg-angulo")?.value || cfg.angulo) || 60;
@@ -306,8 +304,42 @@ function acionarCalculoGeral() {
     
     const cestas = [];
     let itensRestantes = [...itens];
+    let primeiraIteracao = true;
     
+    const dbContainers = carregarJSONSeguro(KEY_CONTAINERS, {});
+    const listaContainersCadastrados = dbContainers[currentUser?.email] || [];
+
     while (itensRestantes.length > 0) {
+        let largura = larguraPadrao;
+        let comprimento = comprimentoPadrao;
+        let cargaMax = cargaMaxPadrao;
+        let tagAtual = tagPadrao;
+
+        // Se não for a primeira partição, pesquisa no banco de dados por um contêiner alternativo
+        if (!primeiraIteracao) {
+            let containerEncontrado = null;
+            
+            // Procura o menor contêiner cadastrado capaz de acomodar o maior dos itens restantes
+            for (let cnt of listaContainersCadastrados) {
+                const maiorItemRestante = itensRestantes[0]; 
+                const cabeComprimento = cnt.comp >= maiorItemRestante[1] && cnt.larg >= maiorItemRestante[3];
+                const cabeInvertido = cnt.larg >= maiorItemRestante[1] && cnt.comp >= maiorItemRestante[3];
+                
+                if ((cabeComprimento || cabeInvertido) && cnt.carga >= maiorItemRestante[2]) {
+                    if (!containerEncontrado || (cnt.comp * cnt.larg < containerEncontrado.comp * containerEncontrado.larg)) {
+                        containerEncontrado = cnt;
+                    }
+                }
+            }
+
+            if (containerEncontrado) {
+                largura = containerEncontrado.larg;
+                comprimento = containerEncontrado.comp;
+                cargaMax = containerEncontrado.carga;
+                tagAtual = containerEncontrado.tag;
+            }
+        }
+
         const grade = new GradeContainer2D(largura, comprimento);
         const cestaAtual = [];
         let pesoAtual = 0;
@@ -327,8 +359,6 @@ function acionarCalculoGeral() {
             }
         }
         
-        // Se houver itens que não couberam de forma alguma por limitação física do contêiner ativo,
-        // força a inserção para gerar o visual estourado/alerta em vez de quebrar a iteração
         if (!mudou && itensRestantes.length > 0) {
             const itemForcado = itensRestantes.shift();
             cestaAtual.push({
@@ -354,6 +384,9 @@ function acionarCalculoGeral() {
             itens: cestaAtual,
             grade: grade,
             pesoTotal: pesoAtual,
+            tagUnica: tagAtual,
+            larguraDoContainer: largura,
+            comprimentoDoContainer: comprimento,
             rigging: {
                 pesoBrutoTotal,
                 fatorAngulo,
@@ -366,10 +399,7 @@ function acionarCalculoGeral() {
             }
         });
         
-        if (!permitirCamadas) {
-            // Se camadas não forem permitidas mas ainda sobrarem itens, o algoritmo original cria novas Cestas autônomas
-            if (itensRestantes.length === 0) break;
-        }
+        primeiraIteracao = false;
     }
     
     const totalEquip = equipamentosMemoria.length;
@@ -393,7 +423,7 @@ function acionarCalculoGeral() {
 
     cestas.forEach((cesta, idxCesta) => {
         const sufixo = permitirCamadas ? `Camada ${idxCesta + 1}` : `Cesta ${idxCesta + 1}`;
-        const tagFinal = `${cfg.tag || "CBR-01"} (${sufixo})`;
+        const tagFinal = `${cesta.tagUnica} (${sufixo})`;
         listaLogistica.push(tagFinal);
 
         cesta.itens.forEach(item => {
@@ -415,13 +445,13 @@ function acionarCalculoGeral() {
         let htmlGraf = `<div class="container-unidade" style="margin-bottom: 30px; background: white; padding: 15px; border-radius: 6px; border: 1px solid #ddd;">`;
         htmlGraf += `<h3>📊 ${tagFinal.toUpperCase()} - PLANO DE ALOCAÇÃO E RIGGING (VISTA HORIZONTAL)</h3>`;
         
-        const escala = 600 / comprimento; 
-        const svgWidth = comprimento * escala; 
-        const svgHeight = largura * escala;    
+        const escala = 600 / cesta.comprimentoDoContainer; 
+        const svgWidth = cesta.comprimentoDoContainer * escala; 
+        const svgHeight = cesta.larguraDoContainer * escala;    
         
         htmlGraf += `<div style="position: relative; width: ${svgWidth}px; height: ${svgHeight}px; border: 3px solid #2C3E50; background: #ECF0F1; margin: 15px auto;">`;
         
-        htmlGraf += `<div style="position: absolute; left: ${(comprimento/2 * escala) - 5}px; top: ${(largura/2 * escala) - 5}px; width: 10px; height: 10px; background: #E74C3C; border-radius: 50%; z-index: 20; border: 1px solid white;" title="Centro Geométrico"></div>`;
+        htmlGraf += `<div style="position: absolute; left: ${(cesta.comprimentoDoContainer/2 * escala) - 5}px; top: ${(cesta.larguraDoContainer/2 * escala) - 5}px; width: 10px; height: 10px; background: #E74C3C; border-radius: 50%; z-index: 20; border: 1px solid white;" title="Centro Geométrico"></div>`;
         
         htmlGraf += `<div style="position: absolute; left: ${(cesta.rigging.cmY * escala) - 6}px; top: ${(cesta.rigging.cmX * escala) - 6}px; width: 12px; height: 12px; background: #2980B9; border-radius: 50%; z-index: 21; border: 2px solid white;" title="Centro de Gravidade"></div>`;
         
