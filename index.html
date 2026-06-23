@@ -69,8 +69,7 @@
         </div>
 
         <div id="tab-plano" class="tab-content">
-            <div id="kpi-container" class="kpi-container">
-                </div>
+            <div id="kpi-container" class="kpi-container"></div>
             
             <div id="alerta-logistica" class="alerta-logistica">
                 ⏳ Aguardando execução do cálculo. Clique em "⚡ CALCULAR TUDO" para iniciar.
@@ -115,6 +114,9 @@
                     <div class="form-group"><label>Altura Max Útil (m):</label><input type="number" id="cfg-alt" step="0.001"></div>
                     <div class="form-group"><label>Tara Estrutural (kg):</label><input type="number" id="cfg-tara"></div>
                     <div class="form-group"><label>Carga Max Útil (kg):</label><input type="number" id="cfg-carga"></div>
+                    
+                    <div class="form-group"><label>Nº de Pernas da Lingada:</label><input type="number" id="cfg-pernas" min="1" max="4" value="4"></div>
+                    <div class="form-group"><label>Ângulo de Içamento (Horizontal °):</label><input type="number" id="cfg-angulo" min="30" max="90" value="60"></div>
                 </div>
                 <div class="form-group row-toggle" style="margin-top: 10px;">
                     <label style="margin-right: 10px;">Sobrepor Múltiplas Camadas:</label>
