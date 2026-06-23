@@ -77,11 +77,6 @@ function switchMainTab(tabId) {
     document.getElementById('tab-' + tabId).classList.remove('hidden');
 }
 
-function executingLogin() {
-    // Mantido por compatibilidade
-    executarLogin();
-}
-
 function executarLogin() {
     const email = document.getElementById("login-email").value.trim().toLowerCase();
     const pwd = document.getElementById("login-pwd").value;
@@ -264,11 +259,10 @@ function renderizarListaContainers() {
 }
 
 function activarContainer(idx) {
-    // Mantido por compatibilidade
     ativarContainer(idx);
 }
 
-function activarContainer(idx) {
+function ativarContainer(idx) {
     const db = carregarJSONSeguro(KEY_CONTAINERS, {});
     const cnt = db[currentUser.email][idx];
     const configCompleta = carregarJSONSeguro(KEY_CONFIG, {});
@@ -317,6 +311,7 @@ function acionarCalculoGeral() {
         const grade = new GradeContainer2D(largura, comprimento);
         const cestaAtual = [];
         let pesoAtual = 0;
+        let mudou = false;
         
         for (let i = 0; i < itensRestantes.length; i++) {
             const item = itensRestantes[i];
@@ -328,20 +323,22 @@ function acionarCalculoGeral() {
                 pesoAtual += item[2];
                 itensRestantes.splice(i, 1);
                 i--; 
+                mudou = true;
             }
         }
         
-        // AJUSTE CRÍTICO: Evita travamento e loops infinitos se itens não couberem fisicamente no contêiner selecionado
-        if (cestaAtual.length === 0 && itensRestantes.length > 0) {
+        // Se houver itens que não couberam de forma alguma por limitação física do contêiner ativo,
+        // força a inserção para gerar o visual estourado/alerta em vez de quebrar a iteração
+        if (!mudou && itensRestantes.length > 0) {
             const itemForcado = itensRestantes.shift();
             cestaAtual.push({
                 nome: itemForcado[0], comp: itemForcado[1], peso: itemForcado[2], larg: itemForcado[3],
                 x: 0, y: 0, px: largura / 2, py: comprimento / 2, rotacionado: false
             });
             pesoAtual += itemForcado[2];
-        } else if (cestaAtual.length === 0) {
-            break;
         }
+        
+        if (cestaAtual.length === 0) break;
         
         const cm = grade.calcularCentroMassa();
         const pesoBrutoTotal = pesoAtual + taraCesta;
@@ -368,6 +365,11 @@ function acionarCalculoGeral() {
                 cmY: cm.cy
             }
         });
+        
+        if (!permitirCamadas) {
+            // Se camadas não forem permitidas mas ainda sobrarem itens, o algoritmo original cria novas Cestas autônomas
+            if (itensRestantes.length === 0) break;
+        }
     }
     
     const totalEquip = equipamentosMemoria.length;
@@ -390,7 +392,6 @@ function acionarCalculoGeral() {
     let listaLogistica = [];
 
     cestas.forEach((cesta, idxCesta) => {
-        // AJUSTE DE NOMENCLATURA: Identifica dinamicamente se o botão "camadas/sobrepor" está ativo
         const sufixo = permitirCamadas ? `Camada ${idxCesta + 1}` : `Cesta ${idxCesta + 1}`;
         const tagFinal = `${cfg.tag || "CBR-01"} (${sufixo})`;
         listaLogistica.push(tagFinal);
