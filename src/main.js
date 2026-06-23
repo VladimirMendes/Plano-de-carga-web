@@ -258,6 +258,10 @@ function renderizarListaContainers() {
     });
 }
 
+function activarContainer(idx) {
+    ativarContainer(idx);
+}
+
 function ativarContainer(idx) {
     const db = carregarJSONSeguro(KEY_CONTAINERS, {});
     const cnt = db[currentUser.email][idx];
@@ -302,7 +306,7 @@ function acionarCalculoGeral() {
     const itens = equipamentosMemoria.map(f => [f.nome, f.comp, f.peso, f.larg])
         .sort((a, b) => (b[1] * b[3]) - (a[1] * a[3])); 
     
-    const cestas = [];
+    const partiçõesBrutas = [];
     let itensRestantes = [...itens];
     let primeiraIteracao = true;
     
@@ -317,7 +321,6 @@ function acionarCalculoGeral() {
 
         if (!primeiraIteracao) {
             let containerEncontrado = null;
-            
             for (let cnt of listaContainersCadastrados) {
                 const maiorItemRestante = itensRestantes[0]; 
                 const cabeComprimento = cnt.comp >= maiorItemRestante[1] && cnt.larg >= maiorItemRestante[3];
@@ -329,7 +332,6 @@ function acionarCalculoGeral() {
                     }
                 }
             }
-
             if (containerEncontrado) {
                 largura = containerEncontrado.larg;
                 comprimento = containerEncontrado.comp;
@@ -367,42 +369,113 @@ function acionarCalculoGeral() {
         }
         
         if (cestaAtual.length === 0) break;
-        
-        const cm = grade.calcularCentroMassa();
-        const pesoBrutoTotal = pesoAtual + taraCesta;
-        const anguloRad = (anguloIçamento * Math.PI) / 180;
-        const fatorAngulo = 1 / Math.sin(anguloRad);
-        const tensaoPorPernaIdeal = (pesoBrutoTotal * fatorAngulo) / numPernas;
-        
-        const desvioX = cm.cx - grade.cx;
-        const desvioY = cm.cy - grade.cy;
-        const estavel = (Math.abs(desvioX) <= largura * 0.1) && (Math.abs(desvioY) <= comprimento * 0.1);
 
-        cestas.push({
+        partiçõesBrutas.push({
             itens: cestaAtual,
             grade: grade,
             pesoTotal: pesoAtual,
             tagUnica: tagAtual,
             larguraDoContainer: largura,
-            comprimentoDoContainer: comprimento,
-            rigging: {
-                pesoBrutoTotal,
-                fatorAngulo,
-                tensaoPorPernaIdeal,
-                desvioX,
-                desvioY,
-                estavel,
-                cmX: cm.cx,
-                cmY: cm.cy
-            }
+            comprimentoDoContainer: comprimento
         });
         
         primeiraIteracao = false;
     }
+
+    // =======================================================
+    // CONSOLIDANDO AS PARTICÕES CONFORME O BOTÃO DE CAMADAS
+    // =======================================================
+    const cestas = [];
+
+    if (permitirCamadas && partiçõesBrutas.length > 0) {
+        // Se camadas ativadas, tudo vira um ÚNICO contêiner físico unificado
+        let pesoTotalAcumulado = 0;
+        let todosItensUnificados = [];
+        let somaMomentosX = 0;
+        let somaMomentosY = 0;
+
+        partiçõesBrutas.forEach(part => {
+            pesoTotalAcumulado += part.pesoTotal;
+            part.itens.forEach(it => {
+                todosItensUnificados.push(it);
+                somaMomentosX += it.peso * it.px;
+                somaMomentosY += it.peso * it.py;
+            });
+        });
+
+        const principal = partiçõesBrutas[0];
+        const cmXGlobal = pesoTotalAcumulado > 0 ? (somaMomentosX / pesoTotalAcumulado) : principal.grade.cx;
+        const cmYGlobal = pesoTotalAcumulado > 0 ? (somaMomentosY / pesoTotalAcumulado) : principal.grade.cy;
+
+        const pesoBrutoTotal = pesoTotalAcumulado + taraCesta;
+        const anguloRad = (anguloIçamento * Math.PI) / 180;
+        const fAngulo = 1 / Math.sin(anguloRad);
+        const tensaoPerna = (pesoBrutoTotal * fAngulo) / numPernas;
+
+        const desvioX = cmXGlobal - principal.grade.cx;
+        const desvioY = cmYGlobal - principal.grade.cy;
+        const estavel = (Math.abs(desvioX) <= principal.larguraDoContainer * 0.1) && (Math.abs(desvioY) <= principal.comprimentoDoContainer * 0.1);
+
+        cestas.push({
+            isCamadasAgrupadas: true,
+            particoesOriginais: partiçõesBrutas, 
+            itens: todosItensUnificados,
+            grade: principal.grade,
+            pesoTotal: pesoTotalAcumulado,
+            tagUnica: principal.tagUnica,
+            larguraDoContainer: principal.larguraDoContainer,
+            comprimentoDoContainer: principal.comprimentoDoContainer,
+            rigging: {
+                pesoBrutoTotal,
+                fatorAngulo: fAngulo,
+                tensaoPorPernaIdeal: tensaoPerna,
+                desvioX,
+                desvioY,
+                estavel,
+                cmX: cmXGlobal,
+                cmY: cmYGlobal
+            }
+        });
+    } else {
+        // Modo padrão: cada partição de espaço físico vira uma cesta autônoma e separada
+        partiçõesBrutas.forEach(part => {
+            const cm = part.grade.calcularCentroMassa();
+            const pesoBrutoTotal = part.pesoTotal + taraCesta;
+            const anguloRad = (anguloIçamento * Math.PI) / 180;
+            const fAngulo = 1 / Math.sin(anguloRad);
+            const tensaoPerna = (pesoBrutoTotal * fAngulo) / numPernas;
+
+            const desvioX = cm.cx - part.grade.cx;
+            const desvioY = cm.cy - part.grade.cy;
+            const estavel = (Math.abs(desvioX) <= part.larguraDoContainer * 0.1) && (Math.abs(desvioY) <= part.comprimentoDoContainer * 0.1);
+
+            cestas.push({
+                isCamadasAgrupadas: false,
+                itens: part.itens,
+                grade: part.grade,
+                pesoTotal: part.pesoTotal,
+                tagUnica: part.tagUnica,
+                larguraDoContainer: part.larguraDoContainer,
+                comprimentoDoContainer: part.comprimentoDoContainer,
+                rigging: {
+                    pesoBrutoTotal,
+                    fatorAngulo: fAngulo,
+                    tensaoPorPernaIdeal: tensaoPerna,
+                    desvioX,
+                    desvioY,
+                    estavel,
+                    cmX: cm.cx,
+                    cmY: cm.cy
+                }
+            });
+        });
+    }
     
     const totalEquip = equipamentosMemoria.length;
     const pesoTotalGeral = equipamentosMemoria.reduce((a, c) => a + c.peso, 0);
-    const numContainers = cestas.length;
+    
+    // Se "Sobrepor Camadas" estiver ligado, exige apenas 1 contêiner físico total.
+    const numContainers = permitirCamadas ? 1 : cestas.length;
     let todasEstaveis = cestas.every(c => c.rigging.estavel);
     
     document.getElementById("kpi-container").innerHTML = `
@@ -419,80 +492,162 @@ function acionarCalculoGeral() {
 
     let listaLogistica = [];
 
+    // =======================================================
+    // RENDERIZAÇÃO DOS GRÁFICOS E TABELAS
+    // =======================================================
     cestas.forEach((cesta, idxCesta) => {
-        const sufixo = permitirCamadas ? `Camada ${idxCesta + 1}` : `Cesta ${idxCesta + 1}`;
-        const tagFinal = `${cesta.tagUnica} (${sufixo})`;
-        listaLogistica.push(tagFinal);
+        
+        if (cesta.isCamadasAgrupadas) {
+            // Se está agrupado por camadas sobrepostas, gera os gráficos separados para cada nível do mesmo contêiner
+            cesta.particoesOriginais.forEach((part, idxPart) => {
+                const tagFinal = `${cesta.tagUnica} (Camada ${idxPart + 1})`;
+                if (!listaLogistica.includes(cesta.tagUnica)) {
+                    listaLogistica.push(cesta.tagUnica);
+                }
 
-        cesta.itens.forEach(item => {
-            const row = document.createElement("tr");
-            row.innerHTML = `
-                <td>${tagFinal}</td>
-                <td><b>${item.nome}</b></td>
-                <td>${item.comp.toFixed(2)}m</td>
-                <td>${item.larg.toFixed(2)}m</td>
-                <td>${item.peso.toFixed(0)} kg</td>
-                <td>${item.px.toFixed(2)}m</td>
-                <td>${item.py.toFixed(2)}m</td>
-                <td>${(item.peso * (item.px - cesta.grade.cx)).toFixed(1)}</td>
-                <td>${(item.peso * (item.py - cesta.grade.cy)).toFixed(1)}</td>
-            `;
-            tbody.appendChild(row);
-        });
+                part.itens.forEach(item => {
+                    const row = document.createElement("tr");
+                    row.innerHTML = `
+                        <td>${tagFinal}</td>
+                        <td><b>${item.nome}</b></td>
+                        <td>${item.comp.toFixed(2)}m</td>
+                        <td>${item.larg.toFixed(2)}m</td>
+                        <td>${item.peso.toFixed(0)} kg</td>
+                        <td>${item.px.toFixed(2)}m</td>
+                        <td>${item.py.toFixed(2)}m</td>
+                        <td>${(item.peso * (item.px - part.grade.cx)).toFixed(1)}</td>
+                        <td>${(item.peso * (item.py - part.grade.cy)).toFixed(1)}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
 
-        let htmlGraf = `<div class="container-unidade" style="margin-bottom: 30px; background: white; padding: 15px; border-radius: 6px; border: 1px solid #ddd;">`;
-        htmlGraf += `<h3>📊 ${tagFinal.toUpperCase()} - PLANO DE ALOCAÇÃO E RIGGING (VISTA HORIZONTAL)</h3>`;
-        
-        // AJUSTE DINÂMICO DE ESCALA: Baseia-se no comprimento real do contêiner específico desta partição
-        const escala = 600 / cesta.comprimentoDoContainer; 
-        const svgWidth = cesta.comprimentoDoContainer * escala; 
-        const svgHeight = cesta.larguraDoContainer * escala;    
-        
-        htmlGraf += `<div style="position: relative; width: ${svgWidth}px; height: ${svgHeight}px; border: 3px solid #2C3E50; background: #ECF0F1; margin: 15px auto;">`;
-        
-        htmlGraf += `<div style="position: absolute; left: ${(cesta.comprimentoDoContainer/2 * escala) - 5}px; top: ${(cesta.larguraDoContainer/2 * escala) - 5}px; width: 10px; height: 10px; background: #E74C3C; border-radius: 50%; z-index: 20; border: 1px solid white;" title="Centro Geométrico"></div>`;
-        
-        htmlGraf += `<div style="position: absolute; left: ${(cesta.rigging.cmY * escala) - 6}px; top: ${(cesta.rigging.cmX * escala) - 6}px; width: 12px; height: 12px; background: #2980B9; border-radius: 50%; z-index: 21; border: 2px solid white;" title="Centro de Gravidade"></div>`;
-        
-        cesta.itens.forEach(item => {
-            const pref = prefixoCor(item.nome);
-            const cor = CORES_MATERIALS[pref] || DEFAULT_COLOR;
+                let htmlGraf = `<div class="container-unidade" style="margin-bottom: 30px; background: white; padding: 15px; border-radius: 6px; border: 1px solid #ddd;">`;
+                htmlGraf += `<h3>📊 ${tagFinal.toUpperCase()} - PLANO DE ALOCAÇÃO EM CAMADAS</h3>`;
+                
+                const escala = 600 / part.comprimentoDoContainer; 
+                const svgWidth = part.comprimentoDoContainer * escala; 
+                const svgHeight = part.larguraDoContainer * escala;    
+                
+                htmlGraf += `<div style="position: relative; width: ${svgWidth}px; height: ${svgHeight}px; border: 3px solid #2C3E50; background: #ECF0F1; margin: 15px auto;">`;
+                htmlGraf += `<div style="position: absolute; left: ${(part.comprimentoDoContainer/2 * escala) - 5}px; top: ${(part.larguraDoContainer/2 * escala) - 5}px; width: 10px; height: 10px; background: #E74C3C; border-radius: 50%; z-index: 20; border: 1px solid white;" title="Centro Geométrico"></div>`;
+                htmlGraf += `<div style="position: absolute; left: ${(cesta.rigging.cmY * escala) - 6}px; top: ${(cesta.rigging.cmX * escala) - 6}px; width: 12px; height: 12px; background: #2980B9; border-radius: 50%; z-index: 21; border: 2px solid white;" title="Centro de Gravidade Global"></div>`;
+                
+                part.itens.forEach(item => {
+                    const pref = prefixoCor(item.nome);
+                    const cor = CORES_MATERIALS[pref] || DEFAULT_COLOR;
+                    const w = item.comp * escala;                 
+                    const h = item.larg * escala;                 
+                    const xLeft = (item.py - item.comp/2) * escala; 
+                    const yTop = (item.px - item.larg/2) * escala;  
+                    
+                    htmlGraf += `
+                        <div style="position: absolute; left: ${xLeft}px; top: ${yTop}px; 
+                             width: ${w}px; height: ${h}px; 
+                             background-color: ${cor}; border: 1px solid #2C3E50; 
+                             display: flex; flex-direction: column; align-items: center; justify-content: center;
+                             font-size: 10px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap;">
+                            <span>${item.nome}</span>
+                            <span style="font-size:8px; font-weight:normal;">${item.peso}kg</span>
+                        </div>
+                    `;
+                });
+                
+                htmlGraf += `</div>`;
+
+                // Exibe os cálculos baseados na somatória GLOBAL de todas as ferramentas e uma única tara
+                if (idxPart === cesta.particoesOriginais.length - 1) {
+                    htmlGraf += `
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; background: #F8F9FA; padding: 12px; border-radius: 4px; border-left: 5px solid ${cesta.rigging.estavel ? '#2ECC71' : '#E74C3C'}; margin-top: 15px; font-size:12px; text-align: left; color:#333;">
+                            <div><b>Carga Líquida Consolidada (Todas Camadas):</b> ${cesta.pesoTotal.toFixed(0)} kg</div>
+                            <div><b>Peso Bruto Unificado (Líquido Total + 1 Tara):</b> ${cesta.rigging.weightBrutoTotal || cesta.rigging.pesoBrutoTotal.toFixed(0)} kg</div>
+                            <div><b>Centro de Gravidade Global (CG):</b> X: ${cesta.rigging.cmX.toFixed(2)}m | Y: ${cesta.rigging.cmY.toFixed(2)}m</div>
+                            <div><b>Desvio de Excentricidade:</b> X: ${cesta.rigging.desvioX.toFixed(2)}m | Y: ${cesta.rigging.desvioY.toFixed(2)}m</div>
+                            <div><b>Fator de Ângulo (FA):</b> ${cesta.rigging.fatorAngulo.toFixed(3)}</div>
+                            <div><b>Tensão Consolidada por Perna:</b> <span style="font-weight:bold; color:#2980B9;">${cesta.rigging.tensaoPorPernaIdeal.toFixed(0)} kgf</span></div>
+                            <div style="grid-column: 1 / -1; font-weight: bold; color: ${cesta.rigging.estavel ? '#27AE60' : '#C0392B'};">
+                                Status da Estrutura: ${cesta.rigging.estavel ? '✅ SEGURO: CG ACUMULADO DENTRO DOS LIMITES' : '⚠️ ALERTA: CG EXCÊNTRICO REARRANJAR PESOS'}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    htmlGraf += `<p style="font-size:11px; color:#7F8C8D; text-align:center;">Os dados consolidados de engenharia e rigging desta unidade estão resumidos na última camada acima.</p>`;
+                }
+                
+                htmlGraf += `</div>`;
+                graficosContainer.innerHTML += htmlGraf;
+            });
+
+        } else {
+            // Renderização padrão se camadas não estiverem ativas (Múltiplas Cestas Independentes)
+            const tagFinal = `${cesta.tagUnica} (${sufixo = `Cesta ${idxCesta + 1}`})`;
+            listaLogistica.push(tagFinal);
+
+            cesta.itens.forEach(item => {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>${tagFinal}</td>
+                    <td><b>${item.nome}</b></td>
+                    <td>${item.comp.toFixed(2)}m</td>
+                    <td>${item.larg.toFixed(2)}m</td>
+                    <td>${item.peso.toFixed(0)} kg</td>
+                    <td>${item.px.toFixed(2)}m</td>
+                    <td>${item.py.toFixed(2)}m</td>
+                    <td>${(item.peso * (item.px - cesta.grade.cx)).toFixed(1)}</td>
+                    <td>${(item.peso * (item.py - cesta.grade.cy)).toFixed(1)}</td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            let htmlGraf = `<div class="container-unidade" style="margin-bottom: 30px; background: white; padding: 15px; border-radius: 6px; border: 1px solid #ddd;">`;
+            htmlGraf += `<h3>📊 ${tagFinal.toUpperCase()} - PLANO DE ALOCAÇÃO E RIGGING (VISTA HORIZONTAL)</h3>`;
             
-            const w = item.comp * escala;                 
-            const h = item.larg * escala;                 
-            const xLeft = (item.py - item.comp/2) * escala; 
-            const yTop = (item.px - item.larg/2) * escala;  
+            const escala = 600 / cesta.comprimentoDoContainer; 
+            const svgWidth = cesta.comprimentoDoContainer * escala; 
+            const svgHeight = cesta.larguraDoContainer * escala;    
+            
+            htmlGraf += `<div style="position: relative; width: ${svgWidth}px; height: ${svgHeight}px; border: 3px solid #2C3E50; background: #ECF0F1; margin: 15px auto;">`;
+            htmlGraf += `<div style="position: absolute; left: ${(cesta.comprimentoDoContainer/2 * escala) - 5}px; top: ${(cesta.larguraDoContainer/2 * escala) - 5}px; width: 10px; height: 10px; background: #E74C3C; border-radius: 50%; z-index: 20; border: 1px solid white;" title="Centro Geométrico"></div>`;
+            htmlGraf += `<div style="position: absolute; left: ${(cesta.rigging.cmY * escala) - 6}px; top: ${(cesta.rigging.cmX * escala) - 6}px; width: 12px; height: 12px; background: #2980B9; border-radius: 50%; z-index: 21; border: 2px solid white;" title="Centro de Gravidade"></div>`;
+            
+            cesta.itens.forEach(item => {
+                const pref = prefixoCor(item.nome);
+                const cor = CORES_MATERIALS[pref] || DEFAULT_COLOR;
+                const w = item.comp * escala;                 
+                const h = item.larg * escala;                 
+                const xLeft = (item.py - item.comp/2) * escala; 
+                const yTop = (item.px - item.larg/2) * escala;  
+                
+                htmlGraf += `
+                    <div style="position: absolute; left: ${xLeft}px; top: ${yTop}px; 
+                         width: ${w}px; height: ${h}px; 
+                         background-color: ${cor}; border: 1px solid #2C3E50; 
+                         display: flex; flex-direction: column; align-items: center; justify-content: center;
+                         font-size: 10px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap;">
+                        <span>${item.nome}</span>
+                        <span style="font-size:8px; font-weight:normal;">${item.peso}kg</span>
+                    </div>
+                `;
+            });
+            
+            htmlGraf += `</div>`;
             
             htmlGraf += `
-                <div style="position: absolute; left: ${xLeft}px; top: ${yTop}px; 
-                     width: ${w}px; height: ${h}px; 
-                     background-color: ${cor}; border: 1px solid #2C3E50; 
-                     display: flex; flex-direction: column; align-items: center; justify-content: center;
-                     font-size: 10px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap;">
-                    <span>${item.nome}</span>
-                    <span style="font-size:8px; font-weight:normal;">${item.peso}kg</span>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; background: #F8F9FA; padding: 12px; border-radius: 4px; border-left: 5px solid ${cesta.rigging.estavel ? '#2ECC71' : '#E74C3C'}; margin-top: 15px; font-size:12px; text-align: left; color:#333;">
+                    <div><b>Carga Líquida:</b> ${cesta.pesoTotal.toFixed(0)} kg</div>
+                    <div><b>Peso Bruto (Líquido + Tara):</b> ${cesta.rigging.pesoBrutoTotal.toFixed(0)} kg</div>
+                    <div><b>Centro de Gravidade (CG):</b> X: ${cesta.rigging.cmX.toFixed(2)}m | Y: ${cesta.rigging.cmY.toFixed(2)}m</div>
+                    <div><b>Desvio de Excentricidade:</b> X: ${cesta.rigging.desvioX.toFixed(2)}m | Y: ${cesta.rigging.desvioY.toFixed(2)}m</div>
+                    <div><b>Fator de Ângulo (FA):</b> ${cesta.rigging.fatorAngulo.toFixed(3)}</div>
+                    <div><b>Tensão Estimada por Perna:</b> <span style="font-weight:bold; color:#2980B9;">${cesta.rigging.tensaoPorPernaIdeal.toFixed(0)} kgf</span></div>
+                    <div style="grid-column: 1 / -1; font-weight: bold; color: ${cesta.rigging.estavel ? '#27AE60' : '#C0392B'};">
+                        Status Estabilidade: ${cesta.rigging.estavel ? '✅ DENTRO DOS LIMITES DE SEGURANÇA (MÁX 10% DESVIO)' : '⚠️ CRÍTICO: CG EXCÊNTRICO! REARRANJE AS FERRAMENTAS PESADAS'}
+                    </div>
                 </div>
             `;
-        });
-        
-        htmlGraf += `</div>`;
-        
-        htmlGraf += `
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; background: #F8F9FA; padding: 12px; border-radius: 4px; border-left: 5px solid ${cesta.rigging.estavel ? '#2ECC71' : '#E74C3C'}; margin-top: 15px; font-size:12px; text-align: left; color:#333;">
-                <div><b>Carga Líquida:</b> ${cesta.pesoTotal.toFixed(0)} kg</div>
-                <div><b>Peso Bruto (Líquido + Tara):</b> ${cesta.rigging.pesoBrutoTotal.toFixed(0)} kg</div>
-                <div><b>Centro de Gravidade (CG):</b> X: ${cesta.rigging.cmX.toFixed(2)}m | Y: ${cesta.rigging.cmY.toFixed(2)}m</div>
-                <div><b>Desvio de Excentricidade:</b> X: ${cesta.rigging.desvioX.toFixed(2)}m | Y: ${cesta.rigging.desvioY.toFixed(2)}m</div>
-                <div><b>Fator de Ângulo (FA):</b> ${cesta.rigging.fatorAngulo.toFixed(3)}</div>
-                <div><b>Tensão Estimada por Perna:</b> <span style="font-weight:bold; color:#2980B9;">${cesta.rigging.tensaoPorPernaIdeal.toFixed(0)} kgf</span></div>
-                <div style="grid-column: 1 / -1; font-weight: bold; color: ${cesta.rigging.estavel ? '#27AE60' : '#C0392B'};">
-                    Status Estabilidade: ${cesta.rigging.estavel ? '✅ DENTRO DOS LIMITES DE SEGURANÇA (MÁX 10% DESVIO)' : '⚠️ CRÍTICO: CG EXCÊNTRICO! REARRANJE AS FERRAMENTAS PESADAS'}
-                </div>
-            </div>
-        `;
-        
-        htmlGraf += `</div>`;
-        graficosContainer.innerHTML += htmlGraf;
+            
+            htmlGraf += `</div>`;
+            graficosContainer.innerHTML += htmlGraf;
+        }
     });
 
     const divAlerta = document.getElementById("alerta-logistica");
