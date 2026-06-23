@@ -392,32 +392,37 @@ function acionarCalculoGeral() {
         });
 
         let htmlGraf = `<div class="container-unidade" style="margin-bottom: 30px; background: white; padding: 15px; border-radius: 6px; border: 1px solid #ddd;">`;
-        htmlGraf += `<h3>📊 ${tagFinal.toUpperCase()} - PLANO DE ALOCAÇÃO E RIGGING</h3>`;
+        htmlGraf += `<h3>📊 ${tagFinal.toUpperCase()} - PLANO DE ALOCAÇÃO E RIGGING (VISTA HORIZONTAL)</h3>`;
         
-        const escala = 500 / comprimento; 
-        const svgWidth = largura * escala;
-        const svgHeight = comprimento * escala;
+        // MODIFICAÇÃO: Ajuste de escala baseado no comprimento fixado na horizontal (eixo X)
+        const escala = 600 / comprimento; 
+        const svgWidth = comprimento * escala; // Eixo X assume a dimensão do Comprimento
+        const svgHeight = largura * escala;    // Eixo Y assume a dimensão da Largura
         
         htmlGraf += `<div style="position: relative; width: ${svgWidth}px; height: ${svgHeight}px; border: 3px solid #2C3E50; background: #ECF0F1; margin: 15px auto;">`;
         
-        htmlGraf += `<div style="position: absolute; left: ${(largura/2 * escala) - 5}px; top: ${(comprimento/2 * escala) - 5}px; width: 10px; height: 10px; background: #E74C3C; border-radius: 50%; z-index: 20; border: 1px solid white;" title="Centro Geométrico"></div>`;
+        // Centro Geométrico Invertido para o Layout Horizontal
+        htmlGraf += `<div style="position: absolute; left: ${(comprimento/2 * escala) - 5}px; top: ${(largura/2 * escala) - 5}px; width: 10px; height: 10px; background: #E74C3C; border-radius: 50%; z-index: 20; border: 1px solid white;" title="Centro Geométrico"></div>`;
         
-        htmlGraf += `<div style="position: absolute; left: ${(cesta.rigging.cmX * escala) - 6}px; top: ${(cesta.rigging.cmY * escala) - 6}px; width: 12px; height: 12px; background: #2980B9; border-radius: 50%; z-index: 21; border: 2px solid white;" title="Centro de Gravidade"></div>`;
+        // Centro de Gravidade Invertido para o Layout Horizontal (Mapeia cmY para X e cmX para Y)
+        htmlGraf += `<div style="position: absolute; left: ${(cesta.rigging.cmY * escala) - 6}px; top: ${(cesta.rigging.cmX * escala) - 6}px; width: 12px; height: 12px; background: #2980B9; border-radius: 50%; z-index: 21; border: 2px solid white;" title="Centro de Gravidade"></div>`;
         
         cesta.itens.forEach(item => {
             const pref = prefixoCor(item.nome);
             const cor = CORES_MATERIALS[pref] || DEFAULT_COLOR;
-            const w = item.larg * escala;
-            const h = item.comp * escala;
-            const xLeft = (item.px - item.larg/2) * escala;
-            const yTop = (item.py - item.comp/2) * escala;
+            
+            // MODIFICAÇÃO: Inversão matemática dos eixos para rotação visual de 90°
+            const w = item.comp * escala;                 // O comprimento real vira a largura horizontal na tela
+            const h = item.larg * escala;                 // A largura real vira a altura vertical na tela
+            const xLeft = (item.py - item.comp/2) * escala; // Mapeia a coordenada Y do algoritmo para a posição X da tela
+            const yTop = (item.px - item.larg/2) * escala;  // Mapeia a coordenada X do algoritmo para a posição Y da tela
             
             htmlGraf += `
                 <div style="position: absolute; left: ${xLeft}px; top: ${yTop}px; 
                      width: ${w}px; height: ${h}px; 
                      background-color: ${cor}; border: 1px solid #2C3E50; 
                      display: flex; flex-direction: column; align-items: center; justify-content: center;
-                     font-size: 10px; font-weight: bold; color: white;">
+                     font-size: 10px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap;">
                     <span>${item.nome}</span>
                     <span style="font-size:8px; font-weight:normal;">${item.peso}kg</span>
                 </div>
