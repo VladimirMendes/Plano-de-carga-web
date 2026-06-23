@@ -77,6 +77,11 @@ function switchMainTab(tabId) {
     document.getElementById('tab-' + tabId).classList.remove('hidden');
 }
 
+function executingLogin() {
+    // Mantido por compatibilidade
+    executarLogin();
+}
+
 function executarLogin() {
     const email = document.getElementById("login-email").value.trim().toLowerCase();
     const pwd = document.getElementById("login-pwd").value;
@@ -258,7 +263,12 @@ function renderizarListaContainers() {
     });
 }
 
-function ativarContainer(idx) {
+function activarContainer(idx) {
+    // Mantido por compatibilidade
+    ativarContainer(idx);
+}
+
+function activarContainer(idx) {
     const db = carregarJSONSeguro(KEY_CONTAINERS, {});
     const cnt = db[currentUser.email][idx];
     const configCompleta = carregarJSONSeguro(KEY_CONFIG, {});
@@ -321,7 +331,17 @@ function acionarCalculoGeral() {
             }
         }
         
-        if (cestaAtual.length === 0) break;
+        // AJUSTE CRÍTICO: Evita travamento e loops infinitos se itens não couberem fisicamente no contêiner selecionado
+        if (cestaAtual.length === 0 && itensRestantes.length > 0) {
+            const itemForcado = itensRestantes.shift();
+            cestaAtual.push({
+                nome: itemForcado[0], comp: itemForcado[1], peso: itemForcado[2], larg: itemForcado[3],
+                x: 0, y: 0, px: largura / 2, py: comprimento / 2, rotacionado: false
+            });
+            pesoAtual += itemForcado[2];
+        } else if (cestaAtual.length === 0) {
+            break;
+        }
         
         const cm = grade.calcularCentroMassa();
         const pesoBrutoTotal = pesoAtual + taraCesta;
@@ -348,8 +368,6 @@ function acionarCalculoGeral() {
                 cmY: cm.cy
             }
         });
-        
-        if (!permitirCamadas) break;
     }
     
     const totalEquip = equipamentosMemoria.length;
@@ -372,7 +390,9 @@ function acionarCalculoGeral() {
     let listaLogistica = [];
 
     cestas.forEach((cesta, idxCesta) => {
-        const tagFinal = permitirCamadas ? `${cfg.tag || "CBR-01"} (Cesta ${idxCesta + 1})` : (cfg.tag || "CBR-01");
+        // AJUSTE DE NOMENCLATURA: Identifica dinamicamente se o botão "camadas/sobrepor" está ativo
+        const sufixo = permitirCamadas ? `Camada ${idxCesta + 1}` : `Cesta ${idxCesta + 1}`;
+        const tagFinal = `${cfg.tag || "CBR-01"} (${sufixo})`;
         listaLogistica.push(tagFinal);
 
         cesta.itens.forEach(item => {
@@ -394,28 +414,24 @@ function acionarCalculoGeral() {
         let htmlGraf = `<div class="container-unidade" style="margin-bottom: 30px; background: white; padding: 15px; border-radius: 6px; border: 1px solid #ddd;">`;
         htmlGraf += `<h3>📊 ${tagFinal.toUpperCase()} - PLANO DE ALOCAÇÃO E RIGGING (VISTA HORIZONTAL)</h3>`;
         
-        // MODIFICAÇÃO: Ajuste de escala baseado no comprimento fixado na horizontal (eixo X)
         const escala = 600 / comprimento; 
-        const svgWidth = comprimento * escala; // Eixo X assume a dimensão do Comprimento
-        const svgHeight = largura * escala;    // Eixo Y assume a dimensão da Largura
+        const svgWidth = comprimento * escala; 
+        const svgHeight = largura * escala;    
         
         htmlGraf += `<div style="position: relative; width: ${svgWidth}px; height: ${svgHeight}px; border: 3px solid #2C3E50; background: #ECF0F1; margin: 15px auto;">`;
         
-        // Centro Geométrico Invertido para o Layout Horizontal
         htmlGraf += `<div style="position: absolute; left: ${(comprimento/2 * escala) - 5}px; top: ${(largura/2 * escala) - 5}px; width: 10px; height: 10px; background: #E74C3C; border-radius: 50%; z-index: 20; border: 1px solid white;" title="Centro Geométrico"></div>`;
         
-        // Centro de Gravidade Invertido para o Layout Horizontal (Mapeia cmY para X e cmX para Y)
         htmlGraf += `<div style="position: absolute; left: ${(cesta.rigging.cmY * escala) - 6}px; top: ${(cesta.rigging.cmX * escala) - 6}px; width: 12px; height: 12px; background: #2980B9; border-radius: 50%; z-index: 21; border: 2px solid white;" title="Centro de Gravidade"></div>`;
         
         cesta.itens.forEach(item => {
             const pref = prefixoCor(item.nome);
             const cor = CORES_MATERIALS[pref] || DEFAULT_COLOR;
             
-            // MODIFICAÇÃO: Inversão matemática dos eixos para rotação visual de 90°
-            const w = item.comp * escala;                 // O comprimento real vira a largura horizontal na tela
-            const h = item.larg * escala;                 // A largura real vira a altura vertical na tela
-            const xLeft = (item.py - item.comp/2) * escala; // Mapeia a coordenada Y do algoritmo para a posição X da tela
-            const yTop = (item.px - item.larg/2) * escala;  // Mapeia a coordenada X do algoritmo para a posição Y da tela
+            const w = item.comp * escala;                 
+            const h = item.larg * escala;                 
+            const xLeft = (item.py - item.comp/2) * escala; 
+            const yTop = (item.px - item.larg/2) * escala;  
             
             htmlGraf += `
                 <div style="position: absolute; left: ${xLeft}px; top: ${yTop}px; 
