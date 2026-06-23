@@ -1,3 +1,9 @@
+// Chaves para simulação do LocalStorage (Sincronizado com database.js)
+const KEY_LEADS = "offshore_leads";
+const KEY_CONFIG = "offshore_config";
+const KEY_CONTAINERS = "offshore_containers";
+const KEY_FERRAMENTAS = "offshore_ferramentas";
+
 // Dados e Estados Iniciais Padrão
 const FERRAMENTAS_PADRAO = [
     {"nome": "TOOL",   "comp": 3.50, "peso": 600.0, "larg": 0.80},
@@ -11,7 +17,7 @@ const FERRAMENTAS_PADRAO = [
 const CONFIG_PADRAO = {
     "tag": "CBR-01", "comp": "10.00", "larg": "2.000",
     "alt": "2.000", "tara": "1500", "carga": "7000", 
-    "camadas": true, "pernas": "4", "angulo": "60" // Adicionados parâmetros de rigging padrão
+    "camadas": true, "pernas": "4", "angulo": "60"
 };
 
 let currentUser = null;
@@ -52,7 +58,9 @@ function switchMainTab(tabId) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
     
-    event.target.classList.add('active');
+    if (event && event.target) {
+        event.target.classList.add('active');
+    }
     document.getElementById('tab-' + tabId).classList.remove('hidden');
 }
 
@@ -120,7 +128,6 @@ function carregarConfigInterface() {
     document.getElementById("cfg-carga").value = cfg.carga;
     document.getElementById("cfg-camadas").checked = cfg.camadas;
     
-    // Atualização: carregar novos elementos de rigging se existirem na UI
     if (document.getElementById("cfg-pernas")) document.getElementById("cfg-pernas").value = cfg.pernas || "4";
     if (document.getElementById("cfg-angulo")) document.getElementById("cfg-angulo").value = cfg.angulo || "60";
     
@@ -152,6 +159,7 @@ function carregarEquipamentosNaMemoria() {
 
 function renderizarGridEquipamentos() {
     const tbody = document.getElementById("grid-equipamentos-body");
+    if (!tbody) return;
     tbody.innerHTML = "";
     equipamentosMemoria.forEach((eq, index) => {
         const tr = document.createElement("tr");
@@ -215,6 +223,7 @@ function adicionarNovoContainer() {
 
 function renderizarListaContainers() {
     const containerLista = document.getElementById("lista-containers-cadastrados");
+    if (!containerLista) return;
     containerLista.innerHTML = "";
     const db = carregarJSONSeguro(KEY_CONTAINERS, {});
     const lista = db[currentUser.email] || [];
@@ -236,7 +245,7 @@ function renderizarListaContainers() {
     });
 }
 
-function activarContainer(idx) {
+function ativarContainer(idx) {
     const db = carregarJSONSeguro(KEY_CONTAINERS, {});
     const cnt = db[currentUser.email][idx];
     const configCompleta = carregarJSONSeguro(KEY_CONFIG, {});
@@ -259,7 +268,6 @@ function removerContainer(idx) {
     renderizarListaContainers();
 }
 
-// Classe GradeContainer2D mantida conforme sua estrutura original
 class GradeContainer2D {
     constructor(largura, comprimento, resolucao = 0.10) {
         this.largura = largura;      
@@ -323,7 +331,7 @@ class GradeContainer2D {
         
         for (const pos of centros) {
             const x = pos.x - larg / 2;
-            const y = pos.y - comp / 2; // Correção física: centralizar o item no ponto candidato
+            const y = pos.y - comp / 2; 
             
             if (x >= 0 && y >= 0 && x + larg <= this.largura && y + comp <= this.comprimento) {
                 if (this.areaLivre(x, y, larg, comp)) {
@@ -355,9 +363,9 @@ class GradeContainer2D {
     calcularCentroMassa() {
         let pesoTotal = 0, momentoX = 0, momentoY = 0;
         for (const item of this.itens) {
-            pesoTotal += item.weight || item.peso;
-            momentoX += (item.weight || item.peso) * item.px;
-            momentoY += (item.weight || item.peso) * item.py;
+            pesoTotal += item.peso;
+            momentoX += item.peso * item.px;
+            momentoY += item.peso * item.py;
         }
         return {
             cx: pesoTotal > 0 ? momentoX / pesoTotal : this.cx,
@@ -367,20 +375,22 @@ class GradeContainer2D {
     }
 }
 
-// Integração das regras de Içamento Offshore dentro do ciclo de cálculo da interface
 function acionarCalculoGeral() {
     const configCompleta = carregarJSONSeguro(KEY_CONFIG, {});
-    const cfg = configCompleta[currentUser.email] || CONFIG_PADRAO;
+    const cfg = configCompleta[currentUser?.email] || CONFIG_PADRAO;
     
-    const largura = parseFloat(cfg.larg);
-    const comprimento = parseFloat(cfg.comp);
-    const cargaMax = parseInt(cfg.carga);
-    const taraCesta = parseFloat(cfg.tara) || 1500.0;
-    const numPernas = parseInt(cfg.pernas) || 4;
-    const anguloIçamento = parseFloat(cfg.angulo) || 60;
-    const permitirCamadas = cfg.camadas;
+    const largura = parseFloat(document.getElementById("cfg-larg")?.value || cfg.larg);
+    const comprimento = parseFloat(document.getElementById("cfg-comp")?.value || cfg.comp);
+    const cargaMax = parseInt(document.getElementById("cfg-carga")?.value || cfg.carga);
+    const taraCesta = parseFloat(document.getElementById("cfg-tara")?.value || cfg.tara) || 1500.0;
+    const numPernas = parseInt(document.getElementById("cfg-pernas")?.value || cfg.pernas) || 4;
+    const anguloIçamento = parseFloat(document.getElementById("cfg-angulo")?.value || cfg.angulo) || 60;
+    const permitirCamadas = document.getElementById("cfg-camadas") ? document.getElementById("cfg-camadas").checked : true;
     
-    // Processa alocação bidimensional dinâmica
+    if(!equipamentosMemoria || equipamentosMemoria.length === 0){
+        equipamentosMemoria = [...FERRAMENTAS_PADRAO];
+    }
+
     const itens = equipamentosMemoria.map(f => [f.nome, f.comp, f.peso, f.larg])
         .sort((a, b) => (b[1] * b[3]) - (a[1] * a[3])); 
     
@@ -407,14 +417,12 @@ function acionarCalculoGeral() {
         
         if (cestaAtual.length === 0) break;
         
-        // CÁLCULOS RIGGING (IÇAMENTO) ADICIONADOS
         const cm = grade.calcularCentroMassa();
         const pesoBrutoTotal = pesoAtual + taraCesta;
         const anguloRad = (anguloIçamento * Math.PI) / 180;
         const fatorAngulo = 1 / Math.sin(anguloRad);
-        const tensaoPorPernaIdeal = (pesoBrutoTotal * FatorAngulo) / numPernas;
+        const tensaoPorPernaIdeal = (pesoBrutoTotal * fatorAngulo) / numPernas;
         
-        // Margem de segurança de excentricidade (10% de tolerância)
         const desvioX = cm.cx - grade.cx;
         const desvioY = cm.cy - grade.cy;
         const estavel = (Math.abs(desvioX) <= largura * 0.1) && (Math.abs(desvioY) <= comprimento * 0.1);
@@ -438,7 +446,6 @@ function acionarCalculoGeral() {
         if (!permitirCamadas) break;
     }
     
-    // Renderização de KPIs de Rigging e Logística
     const totalEquip = equipamentosMemoria.length;
     const pesoTotalGeral = equipamentosMemoria.reduce((a, c) => a + c.peso, 0);
     const numContainers = cestas.length;
@@ -459,10 +466,9 @@ function acionarCalculoGeral() {
     let listaLogistica = [];
 
     cestas.forEach((cesta, idxCesta) => {
-        const tagFinal = permitirCamadas ? `${cfg.tag} (Cesta ${idxCesta + 1})` : cfg.tag;
+        const tagFinal = permitirCamadas ? `${cfg.tag || "CBR-01"} (Cesta ${idxCesta + 1})` : (cfg.tag || "CBR-01");
         listaLogistica.push(tagFinal);
 
-        // Preenche tabela cartesiana de Engenharia
         cesta.itens.forEach(item => {
             const row = document.createElement("tr");
             row.innerHTML = `
@@ -473,30 +479,25 @@ function acionarCalculoGeral() {
                 <td>${item.peso.toFixed(0)} kg</td>
                 <td>${item.px.toFixed(2)}m</td>
                 <td>${item.py.toFixed(2)}m</td>
-                <td>-</td>
-                <td>-</td>
+                <td>${(item.peso * (item.px - cesta.grade.cx)).toFixed(1)}</td>
+                <td>${(item.peso * (item.py - cesta.grade.cy)).toFixed(1)}</td>
             `;
             tbody.appendChild(row);
         });
 
-        // GERAÇÃO DO LAYOUT 2D E RELATÓRIO RIGGER
         let htmlGraf = `<div class="container-unidade" style="margin-bottom: 30px; background: white; padding: 15px; border-radius: 6px; border: 1px solid #ddd;">`;
         htmlGraf += `<h3>📊 ${tagFinal.toUpperCase()} - PLANO DE ALOCAÇÃO E RIGGING</h3>`;
         
-        // Box Gráfico SVG Proporcional
         const escala = 500 / comprimento; 
         const svgWidth = largura * escala;
         const svgHeight = comprimento * escala;
         
         htmlGraf += `<div style="position: relative; width: ${svgWidth}px; height: ${svgHeight}px; border: 3px solid #2C3E50; background: #ECF0F1; margin: 15px auto;">`;
         
-        // Centro Geométrico da Cesta (Olhal Central Teórico)
         htmlGraf += `<div style="position: absolute; left: ${(largura/2 * escala) - 5}px; top: ${(comprimento/2 * escala) - 5}px; width: 10px; height: 10px; background: #E74C3C; border-radius: 50%; z-index: 20; border: 1px solid white;" title="Centro Geométrico"></div>`;
         
-        // Centro de Gravidade Calculado (Massa Real)
         htmlGraf += `<div style="position: absolute; left: ${(cesta.rigging.cmX * escala) - 6}px; top: ${(cesta.rigging.cmY * escala) - 6}px; width: 12px; height: 12px; background: #2980B9; border-radius: 50%; z-index: 21; border: 2px solid white;" title="Centro de Gravidade"></div>`;
         
-        // Renderizar ferramentas na malha
         cesta.itens.forEach(item => {
             const pref = prefixoCor(item.nome);
             const cor = CORES_MATERIALS[pref] || DEFAULT_COLOR;
@@ -519,9 +520,8 @@ function acionarCalculoGeral() {
         
         htmlGraf += `</div>`;
         
-        // Painel de Engenharia de Rigging (Outputs abaixo do Gráfico)
         htmlGraf += `
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; background: #F8F9FA; padding: 12px; border-radius: 4px; border-left: 5px solid ${cesta.rigging.estavel ? '#2ECC71' : '#E74C3C'}; margin-top: 15px; font-size:12px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; background: #F8F9FA; padding: 12px; border-radius: 4px; border-left: 5px solid ${cesta.rigging.estavel ? '#2ECC71' : '#E74C3C'}; margin-top: 15px; font-size:12px; text-align: left; color:#333;">
                 <div><b>Carga Líquida:</b> ${cesta.pesoTotal.toFixed(0)} kg</div>
                 <div><b>Peso Bruto (Líquido + Tara):</b> ${cesta.rigging.pesoBrutoTotal.toFixed(0)} kg</div>
                 <div><b>Centro de Gravidade (CG):</b> X: ${cesta.rigging.cmX.toFixed(2)}m | Y: ${cesta.rigging.cmY.toFixed(2)}m</div>
@@ -545,6 +545,7 @@ function acionarCalculoGeral() {
 
 function inicializarLegendas() {
     const leg = document.getElementById("legenda-cores");
+    if (!leg) return;
     leg.innerHTML = "";
     for(let pref in CORES_MATERIALS) {
         leg.innerHTML += `<div style="background-color:${CORES_MATERIALS[pref]}; color:white; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:700; text-shadow:0 1px 2px rgba(0,0,0,0.3);">${pref}</div>`;
