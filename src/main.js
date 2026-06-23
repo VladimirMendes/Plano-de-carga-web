@@ -1,3 +1,23 @@
+// ==========================================
+// CONFIGURAÇÕES GLOBAIS E DICIONÁRIOS DE CORES
+// ==========================================
+const CORES_MATERIALS = {
+    "TOOL": "#2C3E50",  // Azul Escuro
+    "CAM": "#E67E22",   // Laranja
+    "RAS": "#27AE60",   // Verde
+    "DP": "#8E44AD",    // Roxo
+    "DC": "#2980B9",    // Azul
+    "NOVO": "#7F8C8D"   // Cinza
+};
+const DEFAULT_COLOR = "#34495E";
+
+// Função auxiliar para mapear o prefixo do nome do item para a cor
+function prefixoCor(nome) {
+    if (!nome) return "NOVO";
+    const parte = nome.split("-")[0].split(" ")[0].toUpperCase();
+    return CORES_MATERIALS[parte] ? parte : "NOVO";
+}
+
 // Chaves para simulação do LocalStorage (Sincronizado com database.js)
 const KEY_LEADS = "offshore_leads";
 const KEY_CONFIG = "offshore_config";
@@ -245,7 +265,7 @@ function renderizarListaContainers() {
     });
 }
 
-function ativarContainer(idx) {
+function activarContainer(idx) {
     const db = carregarJSONSeguro(KEY_CONTAINERS, {});
     const cnt = db[currentUser.email][idx];
     const configCompleta = carregarJSONSeguro(KEY_CONFIG, {});
@@ -529,7 +549,7 @@ function acionarCalculoGeral() {
                 <div><b>Fator de Ângulo (FA):</b> ${cesta.rigging.fatorAngulo.toFixed(3)}</div>
                 <div><b>Tensão Estimada por Perna:</b> <span style="font-weight:bold; color:#2980B9;">${cesta.rigging.tensaoPorPernaIdeal.toFixed(0)} kgf</span></div>
                 <div style="grid-column: 1 / -1; font-weight: bold; color: ${cesta.rigging.estavel ? '#27AE60' : '#C0392B'};">
-                    Status Estabilidade: ${cesta.rigging.estavel ? '✅ DENTRO DOS LIMITES DE SEGURANÇA (MÁX 10% DESVIO)' : '⚠️ CRÍTICO: CG EXCÊNTRICO! REARRANJE AS FERRAMENTAS PEZADAS'}
+                    Status Estabilidade: ${cesta.rigging.estavel ? '✅ DENTRO DOS LIMITES DE SEGURANÇA (MÁX 10% DESVIO)' : '⚠️ CRÍTICO: CG EXCÊNTRICO! REARRANJE AS FERRAMENTAS PESADAS'}
                 </div>
             </div>
         `;
@@ -548,6 +568,6 @@ function inicializarLegendas() {
     if (!leg) return;
     leg.innerHTML = "";
     for(let pref in CORES_MATERIALS) {
-        leg.innerHTML += `<div style="background-color:${CORES_MATERIALS[pref]}; color:white; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:700; text-shadow:0 1px 2px rgba(0,0,0,0.3);">${pref}</div>`;
+        leg.innerHTML += `<div style="background-color:${CORES_MATERIALS[pref]}; color:white; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:700; text-shadow:0 1px 2px rgba(0,0,0,0.3); margin-right:5px; display:inline-block;">${pref}</div>`;
     }
 }
