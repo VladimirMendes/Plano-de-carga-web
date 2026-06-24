@@ -303,17 +303,8 @@ function acionarCalculoGeral() {
         equipamentosMemoria = [...FERRAMENTAS_PADRAO];
     }
 
-    // CORREÇÃO: Força os maiores equipamentos (comprimento e área total) para o início do array.
-    // Isso garante que DP e DC fiquem na Camada 1 (base do contêiner), servindo de fundação estável.
     const itens = equipamentosMemoria.map(f => [f.nome, f.comp, f.peso, f.larg])
-        .sort((a, b) => {
-            const areaA = a[1] * a[3];
-            const areaB = b[1] * b[3];
-            if (Math.abs(areaB - areaA) > 0.01) {
-                return areaB - areaA; 
-            }
-            return b[2] - a[2]; // Se a área for idêntica, decide pelo peso
-        }); 
+        .sort((a, b) => (b[1] * b[3]) - (a[1] * a[3])); 
     
     const partiçõesBrutas = [];
     let itensRestantes = [...itens];
@@ -391,9 +382,13 @@ function acionarCalculoGeral() {
         primeiraIteracao = false;
     }
 
+    // =======================================================
+    // CONSOLIDANDO AS PARTICÕES CONFORME O BOTÃO DE CAMADAS
+    // =======================================================
     const cestas = [];
 
     if (permitirCamadas && partiçõesBrutas.length > 0) {
+        // Se camadas ativadas, tudo vira um ÚNICO contêiner físico unificado
         let pesoTotalAcumulado = 0;
         let todosItensUnificados = [];
         let somaMomentosX = 0;
@@ -442,6 +437,7 @@ function acionarCalculoGeral() {
             }
         });
     } else {
+        // Modo padrão: cada partição de espaço físico vira uma cesta autônoma e separada
         partiçõesBrutas.forEach(part => {
             const cm = part.grade.calcularCentroMassa();
             const pesoBrutoTotal = part.pesoTotal + taraCesta;
@@ -478,6 +474,7 @@ function acionarCalculoGeral() {
     const totalEquip = equipamentosMemoria.length;
     const pesoTotalGeral = equipamentosMemoria.reduce((a, c) => a + c.peso, 0);
     
+    // Se "Sobrepor Camadas" estiver ligado, exige apenas 1 contêiner físico total.
     const numContainers = permitirCamadas ? 1 : cestas.length;
     let todasEstaveis = cestas.every(c => c.rigging.estavel);
     
@@ -495,13 +492,17 @@ function acionarCalculoGeral() {
 
     let listaLogistica = [];
 
+    // =======================================================
+    // RENDERIZAÇÃO DOS GRÁFICOS E TABELAS
+    // =======================================================
     cestas.forEach((cesta, idxCesta) => {
         
         if (cesta.isCamadasAgrupadas) {
+            // Se está agrupado por camadas sobrepostas, gera os gráficos separados para cada nível do mesmo contêiner
             cesta.particoesOriginais.forEach((part, idxPart) => {
-                const tagFinal = `${part.tagUnica} (Camada ${idxPart + 1})`;
-                if (!listaLogistica.includes(part.tagUnica)) {
-                    listaLogistica.push(part.tagUnica);
+                const tagFinal = `${cesta.tagUnica} (Camada ${idxPart + 1})`;
+                if (!listaLogistica.includes(cesta.tagUnica)) {
+                    listaLogistica.push(cesta.tagUnica);
                 }
 
                 part.itens.forEach(item => {
@@ -553,11 +554,12 @@ function acionarCalculoGeral() {
                 
                 htmlGraf += `</div>`;
 
+                // Exibe os cálculos baseados na somatória GLOBAL de todas as ferramentas e uma única tara
                 if (idxPart === cesta.particoesOriginais.length - 1) {
                     htmlGraf += `
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; background: #F8F9FA; padding: 12px; border-radius: 4px; border-left: 5px solid ${cesta.rigging.estavel ? '#2ECC71' : '#E74C3C'}; margin-top: 15px; font-size:12px; text-align: left; color:#333;">
                             <div><b>Carga Líquida Consolidada (Todas Camadas):</b> ${cesta.pesoTotal.toFixed(0)} kg</div>
-                            <div><b>Peso Bruto Unificado (Líquido Total + 1 Tara):</b> ${cesta.rigging.pesoBrutoTotal.toFixed(0)} kg</div>
+                            <div><b>Peso Bruto Unificado (Líquido Total + 1 Tara):</b> ${cesta.rigging.weightBrutoTotal || cesta.rigging.pesoBrutoTotal.toFixed(0)} kg</div>
                             <div><b>Centro de Gravidade Global (CG):</b> X: ${cesta.rigging.cmX.toFixed(2)}m | Y: ${cesta.rigging.cmY.toFixed(2)}m</div>
                             <div><b>Desvio de Excentricidade:</b> X: ${cesta.rigging.desvioX.toFixed(2)}m | Y: ${cesta.rigging.desvioY.toFixed(2)}m</div>
                             <div><b>Fator de Ângulo (FA):</b> ${cesta.rigging.fatorAngulo.toFixed(3)}</div>
@@ -576,7 +578,8 @@ function acionarCalculoGeral() {
             });
 
         } else {
-            const tagFinal = `${cesta.tagUnica} (Cesta ${idxCesta + 1})`;
+            // Renderização padrão se camadas não estiverem ativas (Múltiplas Cestas Independentes)
+            const tagFinal = `${cesta.tagUnica} (${sufixo = `Cesta ${idxCesta + 1}`})`;
             listaLogistica.push(tagFinal);
 
             cesta.itens.forEach(item => {
