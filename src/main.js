@@ -303,8 +303,17 @@ function acionarCalculoGeral() {
         equipamentosMemoria = [...FERRAMENTAS_PADRAO];
     }
 
+    // CORREÇÃO: Força os maiores equipamentos (comprimento e área total) para o início do array.
+    // Isso garante que DP e DC fiquem na Camada 1 (base do contêiner), servindo de fundação estável.
     const itens = equipamentosMemoria.map(f => [f.nome, f.comp, f.peso, f.larg])
-        .sort((a, b) => (b[1] * b[3]) - (a[1] * a[3])); 
+        .sort((a, b) => {
+            const areaA = a[1] * a[3];
+            const areaB = b[1] * b[3];
+            if (Math.abs(areaB - areaA) > 0.01) {
+                return areaB - areaA; 
+            }
+            return b[2] - a[2]; // Se a área for idêntica, decide pelo peso
+        }); 
     
     const partiçõesBrutas = [];
     let itensRestantes = [...itens];
@@ -490,7 +499,6 @@ function acionarCalculoGeral() {
         
         if (cesta.isCamadasAgrupadas) {
             cesta.particoesOriginais.forEach((part, idxPart) => {
-                // CORREÇÃO VISUAL: Cada camada agora exibe os dados de tamanho reais e específicos do seu respectivo contêiner mapeado
                 const tagFinal = `${part.tagUnica} (Camada ${idxPart + 1})`;
                 if (!listaLogistica.includes(part.tagUnica)) {
                     listaLogistica.push(part.tagUnica);
@@ -521,8 +529,6 @@ function acionarCalculoGeral() {
                 
                 htmlGraf += `<div style="position: relative; width: ${svgWidth}px; height: ${svgHeight}px; border: 3px solid #2C3E50; background: #ECF0F1; margin: 15px auto;">`;
                 htmlGraf += `<div style="position: absolute; left: ${(part.comprimentoDoContainer/2 * escala) - 5}px; top: ${(part.larguraDoContainer/2 * escala) - 5}px; width: 10px; height: 10px; background: #E74C3C; border-radius: 50%; z-index: 20; border: 1px solid white;" title="Centro Geométrico"></div>`;
-                
-                // Exibe o Centro de Gravidade Global mapeado em escala dinamicamente proporcional para o tamanho desta camada específica
                 htmlGraf += `<div style="position: absolute; left: ${(cesta.rigging.cmY * escala) - 6}px; top: ${(cesta.rigging.cmX * escala) - 6}px; width: 12px; height: 12px; background: #2980B9; border-radius: 50%; z-index: 21; border: 2px solid white;" title="Centro de Gravidade Global"></div>`;
                 
                 part.itens.forEach(item => {
