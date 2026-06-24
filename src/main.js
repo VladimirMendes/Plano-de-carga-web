@@ -382,13 +382,9 @@ function acionarCalculoGeral() {
         primeiraIteracao = false;
     }
 
-    // =======================================================
-    // CONSOLIDANDO AS PARTICÕES CONFORME O BOTÃO DE CAMADAS
-    // =======================================================
     const cestas = [];
 
     if (permitirCamadas && partiçõesBrutas.length > 0) {
-        // Se camadas ativadas, tudo vira um ÚNICO contêiner físico unificado
         let pesoTotalAcumulado = 0;
         let todosItensUnificados = [];
         let somaMomentosX = 0;
@@ -437,7 +433,6 @@ function acionarCalculoGeral() {
             }
         });
     } else {
-        // Modo padrão: cada partição de espaço físico vira uma cesta autônoma e separada
         partiçõesBrutas.forEach(part => {
             const cm = part.grade.calcularCentroMassa();
             const pesoBrutoTotal = part.pesoTotal + taraCesta;
@@ -474,7 +469,6 @@ function acionarCalculoGeral() {
     const totalEquip = equipamentosMemoria.length;
     const pesoTotalGeral = equipamentosMemoria.reduce((a, c) => a + c.peso, 0);
     
-    // Se "Sobrepor Camadas" estiver ligado, exige apenas 1 contêiner físico total.
     const numContainers = permitirCamadas ? 1 : cestas.length;
     let todasEstaveis = cestas.every(c => c.rigging.estavel);
     
@@ -492,17 +486,14 @@ function acionarCalculoGeral() {
 
     let listaLogistica = [];
 
-    // =======================================================
-    // RENDERIZAÇÃO DOS GRÁFICOS E TABELAS
-    // =======================================================
     cestas.forEach((cesta, idxCesta) => {
         
         if (cesta.isCamadasAgrupadas) {
-            // Se está agrupado por camadas sobrepostas, gera os gráficos separados para cada nível do mesmo contêiner
             cesta.particoesOriginais.forEach((part, idxPart) => {
-                const tagFinal = `${cesta.tagUnica} (Camada ${idxPart + 1})`;
-                if (!listaLogistica.includes(cesta.tagUnica)) {
-                    listaLogistica.push(cesta.tagUnica);
+                // CORREÇÃO VISUAL: Cada camada agora exibe os dados de tamanho reais e específicos do seu respectivo contêiner mapeado
+                const tagFinal = `${part.tagUnica} (Camada ${idxPart + 1})`;
+                if (!listaLogistica.includes(part.tagUnica)) {
+                    listaLogistica.push(part.tagUnica);
                 }
 
                 part.itens.forEach(item => {
@@ -530,6 +521,8 @@ function acionarCalculoGeral() {
                 
                 htmlGraf += `<div style="position: relative; width: ${svgWidth}px; height: ${svgHeight}px; border: 3px solid #2C3E50; background: #ECF0F1; margin: 15px auto;">`;
                 htmlGraf += `<div style="position: absolute; left: ${(part.comprimentoDoContainer/2 * escala) - 5}px; top: ${(part.larguraDoContainer/2 * escala) - 5}px; width: 10px; height: 10px; background: #E74C3C; border-radius: 50%; z-index: 20; border: 1px solid white;" title="Centro Geométrico"></div>`;
+                
+                // Exibe o Centro de Gravidade Global mapeado em escala dinamicamente proporcional para o tamanho desta camada específica
                 htmlGraf += `<div style="position: absolute; left: ${(cesta.rigging.cmY * escala) - 6}px; top: ${(cesta.rigging.cmX * escala) - 6}px; width: 12px; height: 12px; background: #2980B9; border-radius: 50%; z-index: 21; border: 2px solid white;" title="Centro de Gravidade Global"></div>`;
                 
                 part.itens.forEach(item => {
@@ -554,12 +547,11 @@ function acionarCalculoGeral() {
                 
                 htmlGraf += `</div>`;
 
-                // Exibe os cálculos baseados na somatória GLOBAL de todas as ferramentas e uma única tara
                 if (idxPart === cesta.particoesOriginais.length - 1) {
                     htmlGraf += `
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; background: #F8F9FA; padding: 12px; border-radius: 4px; border-left: 5px solid ${cesta.rigging.estavel ? '#2ECC71' : '#E74C3C'}; margin-top: 15px; font-size:12px; text-align: left; color:#333;">
                             <div><b>Carga Líquida Consolidada (Todas Camadas):</b> ${cesta.pesoTotal.toFixed(0)} kg</div>
-                            <div><b>Peso Bruto Unificado (Líquido Total + 1 Tara):</b> ${cesta.rigging.weightBrutoTotal || cesta.rigging.pesoBrutoTotal.toFixed(0)} kg</div>
+                            <div><b>Peso Bruto Unificado (Líquido Total + 1 Tara):</b> ${cesta.rigging.pesoBrutoTotal.toFixed(0)} kg</div>
                             <div><b>Centro de Gravidade Global (CG):</b> X: ${cesta.rigging.cmX.toFixed(2)}m | Y: ${cesta.rigging.cmY.toFixed(2)}m</div>
                             <div><b>Desvio de Excentricidade:</b> X: ${cesta.rigging.desvioX.toFixed(2)}m | Y: ${cesta.rigging.desvioY.toFixed(2)}m</div>
                             <div><b>Fator de Ângulo (FA):</b> ${cesta.rigging.fatorAngulo.toFixed(3)}</div>
@@ -578,8 +570,7 @@ function acionarCalculoGeral() {
             });
 
         } else {
-            // Renderização padrão se camadas não estiverem ativas (Múltiplas Cestas Independentes)
-            const tagFinal = `${cesta.tagUnica} (${sufixo = `Cesta ${idxCesta + 1}`})`;
+            const tagFinal = `${cesta.tagUnica} (Cesta ${idxCesta + 1})`;
             listaLogistica.push(tagFinal);
 
             cesta.itens.forEach(item => {
